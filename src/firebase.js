@@ -1,7 +1,6 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth, GoogleAuthProvider } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
-import { getStorage } from 'firebase/storage'
 import { getMessaging, isSupported } from 'firebase/messaging'
 
 const firebaseConfig = {
@@ -17,8 +16,10 @@ const app = initializeApp(firebaseConfig)
 
 export const auth     = getAuth(app)
 export const db       = getFirestore(app)
-export const storage  = getStorage(app)
 export const googleProvider = new GoogleAuthProvider()
+
+// Storage is disabled (requires Blaze plan) — enable later if upgraded
+export const storage  = null
 
 // Messaging is only available in secure contexts (HTTPS / localhost)
 export const getMessagingInstance = async () => {

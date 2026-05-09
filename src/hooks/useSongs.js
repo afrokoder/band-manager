@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react'
 import { collection, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp, query, orderBy } from 'firebase/firestore'
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage'
-import { db, storage } from '../firebase'
+import { db } from '../firebase'
 
 export function useSongs() {
-  const [songs, setSongs]   = useState([])
+  const [songs,   setSongs]   = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -16,37 +15,17 @@ export function useSongs() {
     return unsub
   }, [])
 
-  const addSong = async (data, file, onProgress) => {
-    let fileUrl = null
-    let fileName = null
-
-    if (file) {
-      const storageRef = ref(storage, `songs/${Date.now()}_${file.name}`)
-      await new Promise((resolve, reject) => {
-        const task = uploadBytesResumable(storageRef, file)
-        task.on('state_changed',
-          (snap) => onProgress?.(Math.round(snap.bytesTransferred / snap.totalBytes * 100)),
-          reject,
-          async () => { fileUrl = await getDownloadURL(task.snapshot.ref); resolve() }
-        )
-      })
-      fileName = file.name
-    }
-
-    return addDoc(collection(db, 'songs'), {
+  // File upload omitted — Storage requires Blaze plan.
+  // Pass onSave(data) — no file argument needed.
+  const addSong = (data) =>
+    addDoc(collection(db, 'songs'), {
       ...data,
-      fileUrl,
-      fileName,
+      fileUrl:  null,
+      fileName: null,
       createdAt: serverTimestamp(),
     })
-  }
 
-  const deleteSong = async (song) => {
-    if (song.fileUrl) {
-      try { await deleteObject(ref(storage, song.fileUrl)) } catch {}
-    }
-    await deleteDoc(doc(db, 'songs', song.id))
-  }
+  const deleteSong = (song) => deleteDoc(doc(db, 'songs', song.id))
 
   return { songs, loading, addSong, deleteSong }
 }

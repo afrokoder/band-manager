@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import BottomSheet from '../ui/BottomSheet'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -10,27 +10,19 @@ const empty = () => ({ label: 'Verse 1', chords: '', lyrics: '' })
 
 export default function AddSongSheet({ open, onClose, onSave }) {
   const { user } = useAuth()
-  const fileRef = useRef()
-  const [title,    setTitle]   = useState('')
-  const [key,      setKey]     = useState('D')
-  const [bpm,      setBpm]     = useState('')
-  const [tag,      setTag]     = useState('slow')
-  const [notes,    setNotes]   = useState('')
-  const [sections, setSections]= useState([empty()])
-  const [file,     setFile]    = useState(null)
-  const [progress, setProgress]= useState(0)
-  const [busy,     setBusy]    = useState(false)
-  const [drag,     setDrag]    = useState(false)
+  const [title,    setTitle]    = useState('')
+  const [key,      setKey]      = useState('D')
+  const [bpm,      setBpm]      = useState('')
+  const [tag,      setTag]      = useState('slow')
+  const [notes,    setNotes]    = useState('')
+  const [sections, setSections] = useState([empty()])
+  const [busy,     setBusy]     = useState(false)
 
-  const reset = () => { setTitle(''); setKey('D'); setBpm(''); setTag('slow'); setNotes(''); setSections([empty()]); setFile(null); setProgress(0) }
+  const reset = () => { setTitle(''); setKey('D'); setBpm(''); setTag('slow'); setNotes(''); setSections([empty()]) }
 
   const addSection = () => setSections(s => [...s, empty()])
-  const updSection = (i, field, val) => setSections(s => s.map((x, j) => j===i ? { ...x, [field]: val } : x))
+  const updSection = (i, field, val) => setSections(s => s.map((x, j) => j === i ? { ...x, [field]: val } : x))
   const delSection = (i) => setSections(s => s.filter((_, j) => j !== i))
-
-  const handleFile = (f) => {
-    if (f && f.size < 20 * 1024 * 1024) setFile(f)
-  }
 
   const submit = async () => {
     if (!title.trim()) return
@@ -41,10 +33,9 @@ export default function AddSongSheet({ open, onClose, onSave }) {
         title: title.trim(),
         key, bpm: parseInt(bpm) || 80,
         tags: [tag],
-        color, notes,
-        sections,
+        color, notes, sections,
         addedBy: user?.uid,
-      }, file, setProgress)
+      })
       reset()
       onClose()
     } catch (e) {
@@ -77,7 +68,7 @@ export default function AddSongSheet({ open, onClose, onSave }) {
         <label className="form-label">Mood</label>
         <div className="chips" style={{ paddingBottom: 0 }}>
           {TAGS.map(t => (
-            <div key={t} className={`chip ${tag===t ? 'active' : ''}`} onClick={() => setTag(t)}>{t}</div>
+            <div key={t} className={`chip ${tag === t ? 'active' : ''}`} onClick={() => setTag(t)}>{t}</div>
           ))}
         </div>
       </div>
@@ -109,31 +100,8 @@ export default function AddSongSheet({ open, onClose, onSave }) {
           value={notes} onChange={e => setNotes(e.target.value)} />
       </div>
 
-      {/* File upload */}
-      <div className="form-row">
-        <label className="form-label">Chord Chart / Lyric Sheet (PDF, max 20MB)</label>
-        <div
-          className={`upload-zone ${drag ? 'drag' : ''}`}
-          onDragOver={e => { e.preventDefault(); setDrag(true) }}
-          onDragLeave={() => setDrag(false)}
-          onDrop={e => { e.preventDefault(); setDrag(false); handleFile(e.dataTransfer.files[0]) }}
-          onClick={() => fileRef.current.click()}>
-          <div className="upload-icon">{file ? '📄' : '⬆️'}</div>
-          <div className="upload-text">{file ? file.name : 'Tap or drag to upload'}</div>
-          <div className="upload-sub">{file ? `${(file.size/1024).toFixed(0)} KB` : 'PDF, Word, or image'}</div>
-          <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" style={{ display: 'none' }}
-            onChange={e => handleFile(e.target.files[0])} />
-        </div>
-        {busy && progress > 0 && progress < 100 && (
-          <div className="progress-bar"><div className="progress-fill" style={{ width: `${progress}%` }} /></div>
-        )}
-        {file && (
-          <button onClick={() => setFile(null)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: 13, marginTop: 4 }}>Remove file</button>
-        )}
-      </div>
-
       <button className="btn-primary" disabled={busy || !title.trim()} onClick={submit}>
-        {busy ? (progress > 0 ? `Uploading ${progress}%…` : 'Saving…') : 'Add to Library'}
+        {busy ? 'Saving…' : 'Add to Library'}
       </button>
     </BottomSheet>
   )

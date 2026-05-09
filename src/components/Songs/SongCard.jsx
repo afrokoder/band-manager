@@ -9,7 +9,6 @@ export default function SongCard({ song, onClick }) {
       <div className="song-card-meta">{song.key} · {song.bpm} BPM</div>
       <div className="song-card-tags">
         {song.tags?.map(t => <span key={t} className="tag">{t}</span>)}
-        {song.fileUrl && <span className="tag" style={{ background: 'rgba(52,199,89,0.1)', color: '#1a7f37' }}>📎 file</span>}
       </div>
     </div>
   )
