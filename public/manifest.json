@@ -1,7 +1,7 @@
 {
-  "name": "Band Manager",
-  "short_name": "BandMgr",
-  "description": "Manage your band's songs, setlists, rehearsals and comms",
+  "name": "Amazing Voices · Band Manager",
+  "short_name": "AmazingVoices",
+  "description": "Music team coordination for Amazing Grace Church",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f5f5f7",

@@ -180,7 +180,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); -web
 /* ── Lyrics ── */
 .lyric-section  { margin-bottom: 22px; }
 .lyric-label    { font-size: 11px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
-.chord-line     { font-family: 'Courier New', monospace; font-size: 11px; font-weight: 700; color: #5a5aa0; letter-spacing: 0.5px; display: block; margin-bottom: 2px; }
+.chord-line     { font-family: 'Courier New', monospace; font-size: 11px; font-weight: 700; color: #5a5aa0; letter-spacing: 0.5px; display: block; margin-bottom: 2px; white-space: pre; }
 .lyric-text     { font-size: 16px; line-height: 1.72; letter-spacing: -0.2px; white-space: pre-line; }
 .file-link      { display: flex; align-items: center; gap: 8px; padding: 12px 14px; background: var(--bg); border-radius: var(--r-sm); text-decoration: none; color: var(--accent); font-size: 14px; font-weight: 500; margin-top: 8px; }
 

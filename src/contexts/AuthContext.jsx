@@ -24,15 +24,21 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        setUser(firebaseUser)
-        await loadProfile(firebaseUser.uid)
-      } else {
-        setUser(null)
-        setProfile(null)
-        setNeedsProfile(false)
+      try {
+        if (firebaseUser) {
+          setUser(firebaseUser)
+          await loadProfile(firebaseUser.uid)
+        } else {
+          setUser(null)
+          setProfile(null)
+          setNeedsProfile(false)
+        }
+      } catch (err) {
+        console.error('Auth state error:', err)
+        // Still clear loading so the user isn't stuck on a spinner
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     })
     return unsub
   }, [])
@@ -47,14 +53,27 @@ export function AuthProvider({ children }) {
     }
   }
 
-  const saveProfile = async ({ name, role, group }) => {
-    const uid    = auth.currentUser.uid
-    const idx    = Math.floor(Math.random() * MEMBER_COLORS.length)
-    const color  = MEMBER_COLORS[idx]
+  const saveProfile = async ({ name, roles, groups, photoURL }) => {
+    const uid     = auth.currentUser.uid
+    const idx     = Math.floor(Math.random() * MEMBER_COLORS.length)
+    const color   = MEMBER_COLORS[idx]
     const initial = name.trim()[0].toUpperCase()
-    const data   = { name: name.trim(), role, group, color, initial, createdAt: serverTimestamp() }
+    // Keep legacy singular fields for backward-compat display
+    const now  = new Date()
+    const data = {
+      name: name.trim(),
+      roles,                    // string[]
+      groups,                   // string[]
+      role:  roles[0] || '',    // primary role (legacy compat)
+      group: groups[0] || '',   // primary group (legacy compat)
+      photoURL: photoURL || null,
+      color, initial,
+      createdAt: serverTimestamp(),   // written to Firestore
+    }
     await setDoc(doc(db, 'users', uid), data)
-    setProfile(data)
+    // Store a real Date in local state so createdAt.toDate() works immediately
+    // without needing a round-trip read
+    setProfile({ ...data, createdAt: { toDate: () => now } })
     setNeedsProfile(false)
   }
 
@@ -68,8 +87,10 @@ export function AuthProvider({ children }) {
 
   const logout = () => signOut(auth)
 
+  const isAdmin = (profile?.groups || []).includes('admin')
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, needsProfile, loginEmail, registerEmail, loginGoogle, logout, saveProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, needsProfile, isAdmin, loginEmail, registerEmail, loginGoogle, logout, saveProfile }}>
       {children}
     </AuthContext.Provider>
   )

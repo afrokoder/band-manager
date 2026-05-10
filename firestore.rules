@@ -1,0 +1,119 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    function authed() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return authed() && 'admin' in userDoc().get('groups', []);
+    }
+
+    function inGroup(group) {
+      return authed() && group in userDoc().get('groups', []);
+    }
+
+    // Admin OR band member can manage content
+    function canManage() {
+      return isAdmin() || inGroup('band');
+    }
+
+    // ── User profiles ─────────────────────────────────────────────────────────
+    match /users/{userId} {
+      // Any signed-in user can read profiles (needed for member lists)
+      allow read: if authed();
+
+      // FCM token updates — any user can update only their own token field
+      allow update: if authed()
+                    && request.auth.uid == userId
+                    && request.resource.data.diff(resource.data)
+                         .affectedKeys().hasOnly(['fcmToken']);
+
+      // Profile creation — no self-granting admin
+      allow create: if authed()
+                    && request.auth.uid == userId
+                    && !('admin' in request.resource.data.get('groups', []));
+
+      // Profile update — non-admin users updating their own profile
+      // Cannot add or retain admin via this path
+      allow update: if authed()
+                    && request.auth.uid == userId
+                    && !('admin' in resource.data.get('groups', []))
+                    && !('admin' in request.resource.data.get('groups', []));
+
+      // Admins can write any profile (grant/revoke admin, edit any field)
+      allow write: if isAdmin();
+    }
+
+    // ── Songs ─────────────────────────────────────────────────────────────────
+    match /songs/{id} {
+      allow read:  if authed();
+      allow write: if canManage();
+    }
+
+    // ── Messages ──────────────────────────────────────────────────────────────
+    match /messages/{id} {
+      allow read: if authed();
+
+      // Create — sender must be the authenticated user, text capped at 2000 chars
+      allow create: if authed()
+                    && request.resource.data.senderId == request.auth.uid
+                    && request.resource.data.text.size() <= 2000;
+
+      // Update (edit) — own message or admin, text still capped
+      allow update: if authed()
+                    && (request.auth.uid == resource.data.senderId || isAdmin())
+                    && request.resource.data.text.size() <= 2000;
+
+      // Delete — own message or admin
+      allow delete: if authed()
+                    && (request.auth.uid == resource.data.senderId || isAdmin());
+    }
+
+    // ── Rehearsals ────────────────────────────────────────────────────────────
+    match /rehearsals/{id} {
+      allow read:           if authed();
+      allow create, delete: if canManage();
+
+      // Full update for managers, OR own-RSVP-only update for members
+      allow update: if canManage()
+                    || (authed()
+                        && request.resource.data.diff(resource.data)
+                             .affectedKeys().hasOnly(['rsvp'])
+                        && request.resource.data.rsvp.diff(resource.data.rsvp)
+                             .affectedKeys().hasOnly([request.auth.uid]));
+    }
+
+    // ── Services ──────────────────────────────────────────────────────────────
+    match /services/{id} {
+      allow read:  if authed();
+      allow write: if canManage();
+    }
+
+    // ── Setlists ──────────────────────────────────────────────────────────────
+    match /setlists/{id} {
+      allow read:  if authed();
+      allow write: if canManage();
+    }
+
+    // ── Settings: Pinboard ────────────────────────────────────────────────────
+    match /settings/pinboard {
+      allow read:  if authed();
+      allow write: if isAdmin();
+    }
+
+    // ── Settings: Org ────────────────────────────────────────────────────────
+    // Public read — needed to validate access code before auth exists
+    match /settings/org {
+      allow read:  if true;
+      allow write: if isAdmin();
+    }
+  }
+}

@@ -8,17 +8,34 @@ import AddSongSheet from './AddSongSheet'
 const FILTERS = ['All','Slow','Medium','Upbeat','Anthem']
 
 export default function SongLibrary({ showAdd, onAddClose }) {
-  const { songs, loading, addSong, deleteSong } = useSongs()
-  const { profile } = useAuth()
-  const [filter, setFilter] = useState('All')
-  const [query,  setQuery]  = useState('')
-  const [active, setActive] = useState(null)   // song to show lyrics
+  const { songs, loading, addSong, updateSong, deleteSong } = useSongs()
+  const { profile, isAdmin } = useAuth()
+  const [filter,   setFilter]   = useState('All')
+  const [query,    setQuery]    = useState('')
+  const [active,   setActive]   = useState(null)   // song shown in LyricsSheet
+  const [editing,  setEditing]  = useState(null)   // song being edited
+
+  const isBand    = (profile?.groups || [profile?.group]).includes('band')
+  const canManage = isAdmin || isBand
 
   const visible = songs.filter(s => {
     const matchQ = !query || s.title?.toLowerCase().includes(query.toLowerCase()) || s.key?.toLowerCase().includes(query.toLowerCase())
     const matchF = filter === 'All' || s.tags?.includes(filter.toLowerCase())
     return matchQ && matchF
   })
+
+  const handleSave = async (data, songToEdit) => {
+    if (songToEdit) {
+      await updateSong(songToEdit, data)
+    } else {
+      await addSong(data)
+    }
+  }
+
+  const handleAddClose = () => {
+    setEditing(null)
+    onAddClose?.()
+  }
 
   return (
     <>
@@ -56,12 +73,21 @@ export default function SongLibrary({ showAdd, onAddClose }) {
         </div>
       )}
 
-      {/* Lyrics sheet */}
-      <LyricsSheet song={active} onClose={() => setActive(null)}
-        onDelete={profile?.group === 'band' ? deleteSong : null} />
+      {/* Lyrics / detail sheet */}
+      <LyricsSheet
+        song={active}
+        onClose={() => setActive(null)}
+        onEdit={canManage ? (song) => setEditing(song) : null}
+        onDelete={canManage ? deleteSong : null}
+      />
 
-      {/* Add song sheet */}
-      <AddSongSheet open={showAdd} onClose={onAddClose} onSave={addSong} />
+      {/* Add / Edit sheet — edit mode when `editing` is set */}
+      <AddSongSheet
+        open={showAdd || !!editing}
+        onClose={handleAddClose}
+        onSave={handleSave}
+        song={editing}
+      />
     </>
   )
 }

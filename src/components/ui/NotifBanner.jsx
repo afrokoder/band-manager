@@ -4,7 +4,7 @@ export default function NotifBanner({ msg, onClose }) {
   useEffect(() => {
     const t = setTimeout(onClose, 4000)
     return () => clearTimeout(t)
-  }, [msg])
+  }, [msg, onClose])
 
   return (
     <div className="notif-banner">

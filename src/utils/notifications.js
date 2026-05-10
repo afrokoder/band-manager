@@ -9,10 +9,11 @@ export async function requestNotifPermission(userId) {
   const messaging = await getMessagingInstance()
   if (!messaging) return
 
-  // Register the service worker and pass Firebase config to it
+  // Register the service worker, wait until it is fully active, THEN send config.
+  // Posting before the worker is active means the message is dropped on first install.
   const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js')
-  reg.active?.postMessage({ type: 'FIREBASE_CONFIG', config: firebaseConfig })
   await navigator.serviceWorker.ready
+  reg.active?.postMessage({ type: 'FIREBASE_CONFIG', config: firebaseConfig })
 
   const permission = await Notification.requestPermission()
   if (permission !== 'granted') return

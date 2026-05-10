@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { collection, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp, query, orderBy } from 'firebase/firestore'
+import { collection, onSnapshot, addDoc, deleteDoc, updateDoc, doc, serverTimestamp, query, orderBy } from 'firebase/firestore'
 import { db } from '../firebase'
 
 export function useSongs() {
@@ -25,7 +25,10 @@ export function useSongs() {
       createdAt: serverTimestamp(),
     })
 
+  const updateSong = (song, data) =>
+    updateDoc(doc(db, 'songs', song.id), { ...data, updatedAt: serverTimestamp() })
+
   const deleteSong = (song) => deleteDoc(doc(db, 'songs', song.id))
 
-  return { songs, loading, addSong, deleteSong }
+  return { songs, loading, addSong, updateSong, deleteSong }
 }

@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "bm-default": "band-manager-agm",
+    "default": "band-manager-agm"
+  },
+  "targets": {},
+  "etags": {}
+}

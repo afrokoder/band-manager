@@ -17,10 +17,16 @@ export function useSetlist(eventId) {
     return unsub
   }, [eventId])
 
-  const savePills = (next) => {
+  const savePills = async (next) => {
     if (!eventId) return
-    setPills(next)  // optimistic
-    setDoc(doc(db, 'setlists', eventId), { pills: next }, { merge: true })
+    const prev = pills          // snapshot for rollback
+    setPills(next)              // optimistic update
+    try {
+      await setDoc(doc(db, 'setlists', eventId), { pills: next }, { merge: true })
+    } catch (err) {
+      console.error('Setlist save failed:', err)
+      setPills(prev)            // roll back on failure
+    }
   }
 
   return { pills, loading, savePills }

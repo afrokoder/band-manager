@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import BottomSheet from '../ui/BottomSheet'
 import { useAuth } from '../../contexts/AuthContext'
+import { extractYouTubeId, youtubeThumbnail } from '../../utils/youtube'
 
 const KEYS  = ['A','Bb','B','C','C#','D','Eb','E','F','F#','G','Ab']
 const TAGS  = ['slow','medium','upbeat','anthem']
@@ -8,35 +9,66 @@ const COLORS= ['#6366f1','#ec4899','#f59e0b','#10b981','#8b5cf6','#ef4444','#0ea
 
 const empty = () => ({ label: 'Verse 1', chords: '', lyrics: '' })
 
-export default function AddSongSheet({ open, onClose, onSave }) {
+/**
+ * AddSongSheet — handles both Add and Edit modes.
+ * Edit mode: pass `song` prop (existing song object). onSave receives (data, song).
+ * Add  mode: song is null/undefined.           onSave receives (data, null).
+ */
+export default function AddSongSheet({ open, onClose, onSave, song: editSong }) {
   const { user } = useAuth()
+  const isEdit = !!editSong
+
   const [title,    setTitle]    = useState('')
   const [key,      setKey]      = useState('D')
   const [bpm,      setBpm]      = useState('')
   const [tag,      setTag]      = useState('slow')
   const [notes,    setNotes]    = useState('')
   const [sections, setSections] = useState([empty()])
+  const [ytUrl,    setYtUrl]    = useState('')
   const [busy,     setBusy]     = useState(false)
 
-  const reset = () => { setTitle(''); setKey('D'); setBpm(''); setTag('slow'); setNotes(''); setSections([empty()]) }
+  // Populate form when editing
+  useEffect(() => {
+    if (editSong) {
+      setTitle(editSong.title || '')
+      setKey(editSong.key || 'D')
+      setBpm(editSong.bpm?.toString() || '')
+      setTag(editSong.tags?.[0] || 'slow')
+      setNotes(editSong.notes || '')
+      setSections(editSong.sections?.length ? editSong.sections : [empty()])
+      setYtUrl(editSong.youtubeUrl || '')
+    } else {
+      // Reset for add mode
+      setTitle(''); setKey('D'); setBpm(''); setTag('slow')
+      setNotes(''); setSections([empty()]); setYtUrl('')
+    }
+  }, [editSong, open])
 
   const addSection = () => setSections(s => [...s, empty()])
   const updSection = (i, field, val) => setSections(s => s.map((x, j) => j === i ? { ...x, [field]: val } : x))
   const delSection = (i) => setSections(s => s.filter((_, j) => j !== i))
 
+  const ytVideoId = extractYouTubeId(ytUrl)
+
   const submit = async () => {
     if (!title.trim()) return
     setBusy(true)
     try {
-      const color = COLORS[Math.floor(Math.random() * COLORS.length)]
-      await onSave({
+      const data = {
         title: title.trim(),
-        key, bpm: parseInt(bpm) || 80,
+        key,
+        bpm: parseInt(bpm) || 80,
         tags: [tag],
-        color, notes, sections,
-        addedBy: user?.uid,
-      })
-      reset()
+        notes,
+        sections,
+        youtubeUrl:     ytUrl.trim() || null,
+        youtubeVideoId: ytVideoId || null,
+      }
+      if (!isEdit) {
+        data.color   = COLORS[Math.floor(Math.random() * COLORS.length)]
+        data.addedBy = user?.uid
+      }
+      await onSave(data, editSong || null)
       onClose()
     } catch (e) {
       console.error(e)
@@ -45,7 +77,7 @@ export default function AddSongSheet({ open, onClose, onSave }) {
   }
 
   return (
-    <BottomSheet open={open} onClose={onClose} title="Add Song">
+    <BottomSheet open={open} onClose={onClose} title={isEdit ? 'Edit Song' : 'Add Song'}>
       <div className="form-row">
         <label className="form-label">Title</label>
         <input className="form-input" placeholder="Song title" value={title} onChange={e => setTitle(e.target.value)} />
@@ -71,6 +103,27 @@ export default function AddSongSheet({ open, onClose, onSave }) {
             <div key={t} className={`chip ${tag === t ? 'active' : ''}`} onClick={() => setTag(t)}>{t}</div>
           ))}
         </div>
+      </div>
+
+      {/* YouTube link */}
+      <div className="form-row">
+        <label className="form-label">YouTube Link <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(optional)</span></label>
+        <input className="form-input" placeholder="https://youtu.be/..." value={ytUrl}
+          onChange={e => setYtUrl(e.target.value)} />
+        {ytUrl && !ytVideoId && (
+          <p style={{ fontSize: 12, color: '#ef4444', marginTop: 4 }}>Couldn't recognise that YouTube URL — try copying the link again.</p>
+        )}
+        {ytVideoId && (
+          <div style={{ marginTop: 8, borderRadius: 'var(--r-sm)', overflow: 'hidden', position: 'relative', aspectRatio: '16/9' }}>
+            <img src={youtubeThumbnail(ytVideoId)} alt="YouTube thumbnail"
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Sections */}
@@ -101,7 +154,7 @@ export default function AddSongSheet({ open, onClose, onSave }) {
       </div>
 
       <button className="btn-primary" disabled={busy || !title.trim()} onClick={submit}>
-        {busy ? 'Saving…' : 'Add to Library'}
+        {busy ? 'Saving…' : isEdit ? 'Save Changes' : 'Add to Library'}
       </button>
     </BottomSheet>
   )
