@@ -73,7 +73,7 @@ const config = {
    * Each entry becomes a row in the ServiceCard and a slot in the add/edit form.
    * Rename or add entries to match your order of service.
    */
-  serviceSections: ['Morning Worship', 'Praise & Worship', 'Offering'],
+  serviceSections: ['Morning Worship', 'Praise', 'Worship', 'Praise & Worship', 'Offering'],
 
   // ── Comms ─────────────────────────────────────────────────────────────────
   /**
