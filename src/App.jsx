@@ -42,7 +42,9 @@ export default function App() {
   if (!user)        return <LoginScreen />
   if (needsProfile) return <ProfileSetup />
 
-  const noAdd = tab === 'comms' || (tab === 'schedule' && !isAdmin)
+  const profileGroups = profile?.groups || (profile?.group ? [profile.group] : [])
+  const canAddSchedule = isAdmin || profileGroups.includes('admin') || profile?.group === 'admin'
+  const noAdd = tab === 'comms' || (tab === 'schedule' && !canAddSchedule)
 
   return (
     <div className="app">

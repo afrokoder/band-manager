@@ -87,7 +87,8 @@ export function AuthProvider({ children }) {
 
   const logout = () => signOut(auth)
 
-  const isAdmin = (profile?.groups || []).includes('admin')
+  const profileGroups = profile?.groups || (profile?.group ? [profile.group] : [])
+  const isAdmin = profileGroups.includes('admin') || profile?.group === 'admin'
 
   return (
     <AuthContext.Provider value={{ user, profile, loading, needsProfile, isAdmin, loginEmail, registerEmail, loginGoogle, logout, saveProfile }}>
