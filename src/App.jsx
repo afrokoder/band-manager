@@ -20,7 +20,7 @@ const TABS = [
 const TAB_TITLES = { songs: 'Song Library', setlist: 'Setlist', schedule: 'Schedule', comms: 'Comms' }
 
 export default function App() {
-  const { user, profile, loading, needsProfile } = useAuth()
+  const { user, profile, loading, needsProfile, isAdmin } = useAuth()
   const [tab, setTab]               = useState('songs')
   const [showAdd, setShowAdd]       = useState(false)
   const [showProfile, setShowProfile] = useState(false)
@@ -42,7 +42,9 @@ export default function App() {
   if (!user)        return <LoginScreen />
   if (needsProfile) return <ProfileSetup />
 
-  const noAdd = tab === 'comms'
+  const profileGroups = profile?.groups || (profile?.group ? [profile.group] : [])
+  const canAddSchedule = isAdmin || profileGroups.includes('admin') || profile?.group === 'admin'
+  const noAdd = tab === 'comms' || (tab === 'schedule' && !canAddSchedule)
 
   return (
     <div className="app">
