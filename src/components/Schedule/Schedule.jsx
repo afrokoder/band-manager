@@ -212,32 +212,39 @@ function RehearsalCard({ r, members, onRsvp, onEdit, canManage }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /** Mini member picker — shows all members as tappable avatar chips */
-function MemberPicker({ members, selected, onChange }) {
+function MemberPicker({ members, selected, onChange, disabled = false }) {
   const toggle = (uid) => {
-    onChange(selected.includes(uid) ? selected.filter(x => x !== uid) : [...selected, uid])
+    if (disabled) return
+
+    if (selected.includes(uid)) {
+      onChange([])
+      return
+    }
+
+    onChange([uid])
   }
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-      {members.map(m => {
-        const on = selected.includes(m.id)
-        return (
-          <button key={m.id} onClick={() => toggle(m.id)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '5px 10px 5px 6px',
-              borderRadius: 'var(--r-pill)',
-              border: on ? '2px solid var(--accent)' : '2px solid var(--border)',
-              background: on ? 'rgba(0,113,227,0.08)' : 'var(--bg)',
-              cursor: 'pointer', fontSize: 13, fontWeight: on ? 600 : 400,
-              color: on ? 'var(--accent)' : 'var(--text2)',
-            }}>
-            <Avatar photoURL={m.photoURL} initial={m.initial} color={m.color}
-              style={{ width: 24, height: 24, fontSize: 10 }} />
-            {m.name}
-          </button>
-        )
-      })}
-    </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, opacity: disabled ? 0.45 : 1 }}>
+        {members.map(m => {
+          const on = selected.includes(m.id)
+          return (
+              <button key={m.id} onClick={() => toggle(m.id)} disabled={disabled}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '5px 10px 5px 6px',
+                        borderRadius: 'var(--r-pill)',
+                        border: on ? '2px solid var(--accent)' : '2px solid var(--border)',
+                        background: on ? 'rgba(0,113,227,0.08)' : 'var(--bg)',
+                        cursor: disabled ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: on ? 600 : 400,
+                        color: on ? 'var(--accent)' : 'var(--text2)',
+                      }}>
+                <Avatar photoURL={m.photoURL} initial={m.initial} color={m.color}
+                        style={{ width: 24, height: 24, fontSize: 10 }} />
+                {m.name}
+              </button>
+          )
+        })}
+      </div>
   )
 }
 
@@ -253,8 +260,30 @@ function ServiceSheet({ open, onClose, onSave, onDelete, service, members }) {
   const [confirm, setConfirm] = useState(false)
   const [busy,    setBusy]    = useState(false)
 
+  const hasPraiseOrWorshipAssignee =
+      (sections.Praise?.length || 0) > 0 || (sections.Worship?.length || 0) > 0
+
+  const hasPraiseAndWorshipAssignee =
+      (sections['Praise & Worship']?.length || 0) > 0
+
+  const isSectionDisabled = (sectionName) => {
+    if (sectionName === 'Praise & Worship') return hasPraiseOrWorshipAssignee
+    if (sectionName === 'Praise' || sectionName === 'Worship') return hasPraiseAndWorshipAssignee
+    return false
+  }
+
+  const disabledReason = (sectionName) => {
+    if (sectionName === 'Praise & Worship' && hasPraiseOrWorshipAssignee) {
+      return 'Clear Praise and Worship assignments to use Praise & Worship.'
+    }
+    if ((sectionName === 'Praise' || sectionName === 'Worship') && hasPraiseAndWorshipAssignee) {
+      return 'Clear Praise & Worship to assign Praise or Worship separately.'
+    }
+    return null
+  }
+
   const setSection = (name, uids) =>
-    setSections(prev => ({ ...prev, [name]: uids }))
+      setSections(prev => ({ ...prev, [name]: uids }))
 
   const save = async () => {
     if (!date) return
@@ -280,12 +309,26 @@ function ServiceSheet({ open, onClose, onSave, onDelete, service, members }) {
         <input className="form-input" type="date" value={date} onChange={e => setDate(e.target.value)} />
       </div>
 
-      {config.serviceSections.map(sec => (
-        <div key={sec} className="form-row">
-          <label className="form-label">{sec}</label>
-          <MemberPicker members={members} selected={sections[sec]} onChange={uids => setSection(sec, uids)} />
-        </div>
-      ))}
+      {config.serviceSections.map(sec => {
+        const reason = disabledReason(sec)
+
+        return (
+          <div key={sec} className="form-row">
+            <label className="form-label">{sec}</label>
+            <MemberPicker
+              members={members}
+              selected={sections[sec] || []}
+              disabled={isSectionDisabled(sec)}
+              onChange={uids => setSection(sec, uids)}
+            />
+            {reason && (
+              <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 6 }}>
+                {reason}
+              </div>
+            )}
+          </div>
+        )
+      })}
 
       <button className="btn-primary" style={{ marginTop: 8 }} disabled={busy || !date} onClick={save}>
         {busy ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Service'}
@@ -302,7 +345,20 @@ function ServiceSheet({ open, onClose, onSave, onDelete, service, members }) {
 
 function ServiceCard({ service, members, canManage, onEdit, currentUserId }) {
   const memberMap = Object.fromEntries(members.map(m => [m.id, m]))
-  const iAmIn = config.serviceSections.some(sec =>
+
+  const hasPraiseOrWorshipAssignee =
+    (service.sections?.Praise?.length || 0) > 0 || (service.sections?.Worship?.length || 0) > 0
+
+  const hasPraiseAndWorshipAssignee =
+    (service.sections?.['Praise & Worship']?.length || 0) > 0
+
+  const visibleServiceSections = config.serviceSections.filter(sec => {
+    if (sec === 'Praise & Worship') return !hasPraiseOrWorshipAssignee
+    if (sec === 'Praise' || sec === 'Worship') return !hasPraiseAndWorshipAssignee
+    return true
+  })
+
+  const iAmIn = visibleServiceSections.some(sec =>
     (service.sections?.[sec] || []).includes(currentUserId)
   )
 
@@ -328,7 +384,7 @@ function ServiceCard({ service, members, canManage, onEdit, currentUserId }) {
 
       {/* Section rows */}
       <div style={{ padding: '4px 16px 14px' }}>
-        {config.serviceSections.map(sec => {
+        {visibleServiceSections.map(sec => {
           const assignees = (service.sections?.[sec] || [])
             .map(uid => memberMap[uid])
             .filter(Boolean)
@@ -338,18 +394,20 @@ function ServiceCard({ service, members, canManage, onEdit, currentUserId }) {
             <div key={sec} style={{
               display: 'flex', alignItems: 'flex-start', gap: 10,
               padding: '8px 0',
-              borderBottom: sec !== config.serviceSections[config.serviceSections.length - 1]
+              borderBottom: sec !== visibleServiceSections[visibleServiceSections.length - 1]
                 ? '1px solid var(--border)' : 'none',
             }}>
-              {/* Section label */}
               <div style={{
-                fontSize: 12, fontWeight: 600, color: iAmHere ? 'var(--accent)' : 'var(--text3)',
-                width: 110, flexShrink: 0, paddingTop: 4,
+                fontSize: 12,
+                fontWeight: 600,
+                color: iAmHere ? 'var(--accent)' : 'var(--text3)',
+                width: 110,
+                flexShrink: 0,
+                paddingTop: 4,
               }}>
                 {sec}
               </div>
 
-              {/* Assigned members */}
               {assignees.length === 0 ? (
                 <div style={{ fontSize: 13, color: 'var(--text3)', fontStyle: 'italic', paddingTop: 3 }}>
                   TBD
@@ -358,14 +416,25 @@ function ServiceCard({ service, members, canManage, onEdit, currentUserId }) {
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {assignees.map(m => (
                     <div key={m.id} style={{
-                      display: 'flex', alignItems: 'center', gap: 5,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 5,
                       background: m.id === currentUserId ? 'rgba(0,113,227,0.08)' : 'var(--bg)',
                       border: m.id === currentUserId ? '1.5px solid var(--accent)' : '1.5px solid transparent',
-                      borderRadius: 'var(--r-pill)', padding: '3px 8px 3px 4px',
+                      borderRadius: 'var(--r-pill)',
+                      padding: '3px 8px 3px 4px',
                     }}>
-                      <Avatar photoURL={m.photoURL} initial={m.initial} color={m.color}
-                        style={{ width: 22, height: 22, fontSize: 9 }} />
-                      <span style={{ fontSize: 12, fontWeight: m.id === currentUserId ? 600 : 400, color: m.id === currentUserId ? 'var(--accent)' : 'var(--text1)' }}>
+                      <Avatar
+                        photoURL={m.photoURL}
+                        initial={m.initial}
+                        color={m.color}
+                        style={{ width: 22, height: 22, fontSize: 9 }}
+                      />
+                      <span style={{
+                        fontSize: 12,
+                        fontWeight: m.id === currentUserId ? 600 : 400,
+                        color: m.id === currentUserId ? 'var(--accent)' : 'var(--text1)',
+                      }}>
                         {m.name}
                       </span>
                     </div>
