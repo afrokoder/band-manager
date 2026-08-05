@@ -1,6 +1,56 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import BottomSheet from '../ui/BottomSheet'
 import { youtubeEmbedUrl } from '../../utils/youtube'
+
+function SheetMenu({ onEdit, onDelete }) {
+  const [open, setOpen] = useState(false)
+  const [pos,  setPos]  = useState(null)
+  const btnRef = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    const close = () => setOpen(false)
+    document.addEventListener('click', close, { once: true })
+    return () => document.removeEventListener('click', close)
+  }, [open])
+
+  const toggle = (e) => {
+    e.stopPropagation()
+    if (open) { setOpen(false); return }
+    const r = btnRef.current.getBoundingClientRect()
+    setPos({ top: r.bottom + 6, right: window.innerWidth - r.right })
+    setOpen(true)
+  }
+
+  return (
+    <>
+      <button ref={btnRef} onClick={toggle}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 8px', fontSize: 20, lineHeight: 1, color: 'var(--text2)', borderRadius: 6 }}>
+        ···
+      </button>
+      {open && pos && createPortal(
+        <div style={{ position: 'fixed', top: pos.top, right: pos.right, zIndex: 9999,
+          background: 'var(--surface)', borderRadius: 10, boxShadow: '0 4px 24px rgba(0,0,0,0.16)', minWidth: 160, overflow: 'hidden' }}>
+          {onEdit && (
+            <button onClick={(e) => { e.stopPropagation(); setOpen(false); onEdit() }}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--accent)', fontWeight: 500 }}>
+              ✏️ Edit Song
+            </button>
+          )}
+          {onEdit && onDelete && <div style={{ height: 1, background: 'var(--border)', margin: '0 10px' }} />}
+          {onDelete && (
+            <button onClick={(e) => { e.stopPropagation(); setOpen(false); onDelete() }}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 14, color: '#ff3b30', fontWeight: 500 }}>
+              🗑️ Remove from Library
+            </button>
+          )}
+        </div>,
+        document.body
+      )}
+    </>
+  )
+}
 
 export default function LyricsSheet({ song, onClose, onDelete, onEdit }) {
   const [confirm,    setConfirm]    = useState(false)
@@ -15,11 +65,18 @@ export default function LyricsSheet({ song, onClose, onDelete, onEdit }) {
 
   const embedUrl = youtubeEmbedUrl(song.youtubeVideoId)
 
+  const menuAction = (onEdit || onDelete) ? (
+    <SheetMenu
+      onEdit={onEdit ? () => { onClose(); onEdit(song) } : null}
+      onDelete={onDelete ? () => setConfirm(true) : null}
+    />
+  ) : null
+
   return (
     <BottomSheet open onClose={onClose}
       title={song.title}
       subtitle={`Key: ${song.key} · ${song.bpm} BPM`}
-      action={onEdit ? { label: 'Edit', onPress: () => { onClose(); onEdit(song) } } : null}>
+      action={menuAction}>
 
       {/* YouTube player */}
       {embedUrl && (
@@ -70,17 +127,11 @@ export default function LyricsSheet({ song, onClose, onDelete, onEdit }) {
         </div>
       )}
 
-      {/* Delete */}
-      {onDelete && (
-        <div style={{ marginTop: 24 }}>
-          {confirm ? (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setConfirm(false)}>Cancel</button>
-              <button className="btn-danger" style={{ flex: 1 }} onClick={handleDelete}>Delete Song</button>
-            </div>
-          ) : (
-            <button className="btn-danger" onClick={() => setConfirm(true)}>Remove from Library</button>
-          )}
+      {/* Confirm delete */}
+      {confirm && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 24 }}>
+          <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setConfirm(false)}>Cancel</button>
+          <button className="btn-danger" style={{ flex: 1 }} onClick={handleDelete}>Delete Song</button>
         </div>
       )}
     </BottomSheet>
