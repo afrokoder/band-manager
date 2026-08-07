@@ -6,7 +6,7 @@ import {
   signOut,
   onAuthStateChanged,
 } from 'firebase/auth'
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db, googleProvider } from '../firebase'
 
 const AuthContext = createContext(null)
@@ -77,6 +77,31 @@ export function AuthProvider({ children }) {
     setNeedsProfile(false)
   }
 
+  const updateProfile = async ({ groups, roles }) => {
+    const uid = auth.currentUser?.uid
+    if (!uid || !profile) throw new Error('No signed-in profile to update')
+
+    // Admin membership is permission-controlled and cannot be self-selected in the UI.
+    // Preserve it when an existing admin edits their musical groups and roles.
+    const currentGroups = Array.isArray(profile.groups)
+      ? profile.groups
+      : (profile.group ? [profile.group] : [])
+    const keepsAdmin = currentGroups.includes('admin')
+    const nextGroups = [...new Set([...(keepsAdmin ? ['admin'] : []), ...groups])]
+    const nextRoles = [...new Set(roles)]
+
+    const data = {
+      groups: nextGroups,
+      roles: nextRoles,
+      group: nextGroups.find(group => group !== 'admin') || nextGroups[0] || '',
+      role: nextRoles[0] || '',
+      updatedAt: serverTimestamp(),
+    }
+
+    await updateDoc(doc(db, 'users', uid), data)
+    setProfile(current => ({ ...current, ...data, updatedAt: new Date() }))
+  }
+
   const loginEmail = (email, password) =>
     signInWithEmailAndPassword(auth, email, password)
 
@@ -91,7 +116,7 @@ export function AuthProvider({ children }) {
   const isAdmin = profileGroups.includes('admin') || profile?.group === 'admin'
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, needsProfile, isAdmin, loginEmail, registerEmail, loginGoogle, logout, saveProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, needsProfile, isAdmin, loginEmail, registerEmail, loginGoogle, logout, saveProfile, updateProfile }}>
       {children}
     </AuthContext.Provider>
   )
