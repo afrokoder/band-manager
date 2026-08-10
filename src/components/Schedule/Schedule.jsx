@@ -1,10 +1,51 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useRehearsals, useMembers } from '../../hooks/useRehearsals'
 import { useServices } from '../../hooks/useServices'
 import { useAuth } from '../../contexts/AuthContext'
 import BottomSheet from '../ui/BottomSheet'
 import Avatar from '../ui/Avatar'
 import config from '../../config'
+
+function DeleteMenu({ label, onDelete }) {
+  const [open, setOpen] = useState(false)
+  const [pos,  setPos]  = useState(null)
+  const btnRef = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    const close = () => setOpen(false)
+    document.addEventListener('click', close, { once: true })
+    return () => document.removeEventListener('click', close)
+  }, [open])
+
+  const toggle = (e) => {
+    e.stopPropagation()
+    if (open) { setOpen(false); return }
+    const r = btnRef.current.getBoundingClientRect()
+    setPos({ top: r.bottom + 6, right: window.innerWidth - r.right })
+    setOpen(true)
+  }
+
+  return (
+    <>
+      <button ref={btnRef} onClick={toggle}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 8px', fontSize: 20, lineHeight: 1, color: 'var(--text2)', borderRadius: 6 }}>
+        ···
+      </button>
+      {open && pos && createPortal(
+        <div style={{ position: 'fixed', top: pos.top, right: pos.right, zIndex: 9999,
+          background: 'var(--surface)', borderRadius: 10, boxShadow: '0 4px 24px rgba(0,0,0,0.16)', minWidth: 160, overflow: 'hidden' }}>
+          <button onClick={(e) => { e.stopPropagation(); setOpen(false); onDelete() }}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 14, color: '#ff3b30', fontWeight: 500 }}>
+            🗑️ {label}
+          </button>
+        </div>,
+        document.body
+      )}
+    </>
+  )
+}
 
 const GL = { all: 'Everyone', band: 'Band', vocals: 'Vocals' }
 
@@ -70,7 +111,9 @@ function RehearsalSheet({ open, onClose, onSave, onDelete, rehearsal }) {
   }
 
   return (
-    <BottomSheet open={open} onClose={onClose} title={isEdit ? 'Edit Rehearsal' : 'Add Rehearsal'} key={rehearsal?.id || 'new-r'}>
+    <BottomSheet open={open} onClose={onClose} title={isEdit ? 'Edit Rehearsal' : 'Add Rehearsal'}
+      key={rehearsal?.id || 'new-r'}
+      action={isEdit ? <DeleteMenu label="Delete Rehearsal" onDelete={() => setConfirm(true)} /> : null}>
       <div className="form-row">
         <label className="form-label">Name</label>
         <input className="form-input" placeholder="e.g. Sunday Service Prep" value={name} onChange={e => setName(e.target.value)} />
@@ -100,16 +143,10 @@ function RehearsalSheet({ open, onClose, onSave, onDelete, rehearsal }) {
       <button className="btn-primary" disabled={busy || !name || !date} onClick={save}>
         {busy ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Rehearsal'}
       </button>
-      {isEdit && (
-        <div style={{ marginTop: 12 }}>
-          {confirm ? (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setConfirm(false)}>Cancel</button>
-              <button className="btn-danger" style={{ flex: 1 }} onClick={handleDelete} disabled={busy}>Delete</button>
-            </div>
-          ) : (
-            <button className="btn-danger" onClick={() => setConfirm(true)}>Delete Rehearsal</button>
-          )}
+      {confirm && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setConfirm(false)}>Cancel</button>
+          <button className="btn-danger" style={{ flex: 1 }} onClick={handleDelete} disabled={busy}>Delete</button>
         </div>
       )}
     </BottomSheet>
@@ -264,7 +301,9 @@ function ServiceSheet({ open, onClose, onSave, onDelete, service, members }) {
   }
 
   return (
-    <BottomSheet open={open} onClose={onClose} title={isEdit ? 'Edit Service' : 'Add Service'} key={service?.id || 'new-s'}>
+    <BottomSheet open={open} onClose={onClose} title={isEdit ? 'Edit Service' : 'Add Service'}
+      key={service?.id || 'new-s'}
+      action={isEdit ? <DeleteMenu label="Delete Service" onDelete={() => setConfirm(true)} /> : null}>
       <div className="form-row">
         <label className="form-label">Date</label>
         <input className="form-input" type="date" value={date} onChange={e => setDate(e.target.value)} />
@@ -294,17 +333,10 @@ function ServiceSheet({ open, onClose, onSave, onDelete, service, members }) {
       <button className="btn-primary" style={{ marginTop: 8 }} disabled={busy || !date} onClick={save}>
         {busy ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Service'}
       </button>
-
-      {isEdit && (
-        <div style={{ marginTop: 12 }}>
-          {confirm ? (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setConfirm(false)}>Cancel</button>
-              <button className="btn-danger" style={{ flex: 1 }} onClick={handleDelete} disabled={busy}>Delete</button>
-            </div>
-          ) : (
-            <button className="btn-danger" onClick={() => setConfirm(true)}>Delete Service</button>
-          )}
+      {confirm && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setConfirm(false)}>Cancel</button>
+          <button className="btn-danger" style={{ flex: 1 }} onClick={handleDelete} disabled={busy}>Delete</button>
         </div>
       )}
     </BottomSheet>
