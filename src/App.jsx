@@ -17,7 +17,7 @@ const TABS = [
   { id: 'comms',    label: 'Comms',    icon: <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> },
 ]
 
-const TAB_TITLES = { songs: 'Song Library', setlist: 'Setlist', schedule: 'Schedule', comms: 'Comms' }
+const TAB_TITLES = { songs: 'Song Library', setlist: 'Set Lists', schedule: 'Schedule', comms: 'Comms' }
 
 export default function App() {
   const { user, profile, loading, needsProfile, isAdmin } = useAuth()

@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth, GoogleAuthProvider } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
+import { getStorage } from 'firebase/storage'
 import { getMessaging, isSupported } from 'firebase/messaging'
 
 const firebaseConfig = {
@@ -18,8 +19,9 @@ export const auth = getAuth(app)
 export const db       = getFirestore(app)
 export const googleProvider = new GoogleAuthProvider()
 
-// Storage is disabled (requires Blaze plan) — enable later if upgraded
-export const storage  = null
+// Storage powers song/set-list file attachments and voice memos.
+// The app still loads if Storage is unavailable; uploads will surface an error to the user.
+export const storage  = firebaseConfig.storageBucket ? getStorage(app) : null
 
 // Messaging is only available in secure contexts (HTTPS / localhost)
 export const getMessagingInstance = async () => {
