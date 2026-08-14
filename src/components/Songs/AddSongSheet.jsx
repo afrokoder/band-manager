@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import BottomSheet from '../ui/BottomSheet'
 import { useAuth } from '../../contexts/AuthContext'
 import { extractYouTubeId, youtubeThumbnail } from '../../utils/youtube'
+import { uploadMediaFile } from '../../utils/mediaUpload'
+import SongMediaFields from './SongMediaFields'
 
 const KEYS  = ['A','Bb','B','C','C#','D','Eb','E','F','F#','G','Ab']
 const TAGS  = ['slow','medium','upbeat','anthem']
@@ -26,6 +28,8 @@ export default function AddSongSheet({ open, onClose, onSave, song: editSong }) 
   const [sections, setSections] = useState([empty()])
   const [ytUrl,    setYtUrl]    = useState('')
   const [busy,     setBusy]     = useState(false)
+  const [attachment, setAttachment] = useState(null)
+  const [voiceMemo, setVoiceMemo] = useState(null)
 
   // Populate form when editing
   useEffect(() => {
@@ -37,10 +41,13 @@ export default function AddSongSheet({ open, onClose, onSave, song: editSong }) 
       setNotes(editSong.notes || '')
       setSections(editSong.sections?.length ? editSong.sections : [empty()])
       setYtUrl(editSong.youtubeUrl || '')
+      setAttachment(null)
+      setVoiceMemo(null)
     } else {
       // Reset for add mode
       setTitle(''); setKey('D'); setBpm(''); setTag('slow')
       setNotes(''); setSections([empty()]); setYtUrl('')
+      setAttachment(null); setVoiceMemo(null)
     }
   }, [editSong, open])
 
@@ -54,6 +61,11 @@ export default function AddSongSheet({ open, onClose, onSave, song: editSong }) 
     if (!title.trim()) return
     setBusy(true)
     try {
+      const [uploadedAttachment, uploadedVoiceMemo] = await Promise.all([
+        attachment ? uploadMediaFile(attachment, user?.uid, 'songs') : Promise.resolve(null),
+        voiceMemo ? uploadMediaFile(voiceMemo, user?.uid, 'songs') : Promise.resolve(null),
+      ])
+
       const data = {
         title: title.trim(),
         key,
@@ -63,6 +75,8 @@ export default function AddSongSheet({ open, onClose, onSave, song: editSong }) 
         sections,
         youtubeUrl:     ytUrl.trim() || null,
         youtubeVideoId: ytVideoId || null,
+        attachment: uploadedAttachment || editSong?.attachment || null,
+        voiceMemo: uploadedVoiceMemo || editSong?.voiceMemo || null,
       }
       if (!isEdit) {
         data.color   = COLORS[Math.floor(Math.random() * COLORS.length)]
@@ -125,6 +139,14 @@ export default function AddSongSheet({ open, onClose, onSave, song: editSong }) 
           </div>
         )}
       </div>
+
+
+      <SongMediaFields
+        attachment={attachment}
+        voiceMemo={voiceMemo}
+        onAttachmentChange={setAttachment}
+        onVoiceMemoChange={setVoiceMemo}
+      />
 
       {/* Sections */}
       <div style={{ marginBottom: 14 }}>

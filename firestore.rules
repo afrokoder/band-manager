@@ -54,8 +54,14 @@ service cloud.firestore {
 
     // ── Songs ─────────────────────────────────────────────────────────────────
     match /songs/{id} {
-      allow read:  if authed();
-      allow write: if canManage();
+      allow read: if authed();
+
+      // Any signed-in user may add a song they created (needed when a song is
+      // added manually while building a set list). Existing songs remain
+      // manager-controlled.
+      allow create: if authed()
+                    && request.resource.data.addedBy == request.auth.uid;
+      allow update, delete: if canManage();
     }
 
     // ── Messages ──────────────────────────────────────────────────────────────
@@ -99,8 +105,56 @@ service cloud.firestore {
 
     // ── Setlists ──────────────────────────────────────────────────────────────
     match /setlists/{id} {
-      allow read:  if authed();
+      // Drafts are private to their creator.
+      // Published/submitted set lists are visible to the whole signed-in team.
+      allow read: if authed()
+                  && (resource.data.status in ['published', 'submitted']
+                      || resource.data.createdBy == request.auth.uid);
+
+      allow create: if authed()
+                    && request.resource.data.createdBy == request.auth.uid;
+
+      // Upcoming set lists can be changed or deleted by the creator or an admin.
+      // Adding one day keeps the set editable for the service date itself.
+      allow update, delete: if authed()
+                            && (resource.data.createdBy == request.auth.uid || isAdmin())
+                            && resource.data.serviceDateTs + 86400000 > request.time.toMillis();
+    }
+
+    // Per-open audit records. Any signed-in viewer can record their own view.
+    // Only the set-list creator or an admin can read the view history.
+    match /setlists/{setlistId}/views/{viewId} {
+      allow create: if authed()
+                    && request.resource.data.viewerId == request.auth.uid
+                    && get(/databases/$(database)/documents/setlists/$(setlistId)).data.status in ['published', 'submitted'];
+      allow read: if authed()
+                  && (get(/databases/$(database)/documents/setlists/$(setlistId)).data.createdBy == request.auth.uid
+                      || isAdmin());
+      allow update, delete: if false;
+    }
+
+    // One schedule item per calendar date. These reservation documents make
+    // duplicate prevention atomic even when two managers save at the same time.
+    match /serviceDateSlots/{dateKey} {
+      allow read: if authed();
       allow write: if canManage();
+    }
+
+    match /rehearsalDateSlots/{dateKey} {
+      allow read: if authed();
+      allow write: if canManage();
+    }
+
+    // Deterministic service/section reservation used to guarantee that only one
+    // published set list can be attached to a service section at a time.
+    match /setlistSlots/{slotId} {
+      allow read: if authed();
+      allow create: if authed()
+                    && (request.resource.data.createdBy == request.auth.uid || isAdmin())
+                    && getAfter(/databases/$(database)/documents/setlists/$(request.resource.data.setlistId)).data.status == 'published';
+      allow update: if false;
+      allow delete: if authed()
+                    && (resource.data.createdBy == request.auth.uid || isAdmin());
     }
 
     // ── Settings: Pinboard ────────────────────────────────────────────────────

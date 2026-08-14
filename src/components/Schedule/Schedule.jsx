@@ -1,51 +1,12 @@
-import { useState, useEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { useState } from 'react'
 import { useRehearsals, useMembers } from '../../hooks/useRehearsals'
 import { useServices } from '../../hooks/useServices'
+import { useSetlists, useSetlistLookup } from '../../hooks/useSetlists'
+import { SetlistViewer } from '../Setlist/SetlistBuilder'
 import { useAuth } from '../../contexts/AuthContext'
 import BottomSheet from '../ui/BottomSheet'
 import Avatar from '../ui/Avatar'
 import config from '../../config'
-
-function DeleteMenu({ label, onDelete }) {
-  const [open, setOpen] = useState(false)
-  const [pos,  setPos]  = useState(null)
-  const btnRef = useRef(null)
-
-  useEffect(() => {
-    if (!open) return
-    const close = () => setOpen(false)
-    document.addEventListener('click', close, { once: true })
-    return () => document.removeEventListener('click', close)
-  }, [open])
-
-  const toggle = (e) => {
-    e.stopPropagation()
-    if (open) { setOpen(false); return }
-    const r = btnRef.current.getBoundingClientRect()
-    setPos({ top: r.bottom + 6, right: window.innerWidth - r.right })
-    setOpen(true)
-  }
-
-  return (
-    <>
-      <button ref={btnRef} onClick={toggle}
-        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 8px', fontSize: 20, lineHeight: 1, color: 'var(--text2)', borderRadius: 6 }}>
-        ···
-      </button>
-      {open && pos && createPortal(
-        <div style={{ position: 'fixed', top: pos.top, right: pos.right, zIndex: 9999,
-          background: 'var(--surface)', borderRadius: 10, boxShadow: '0 4px 24px rgba(0,0,0,0.16)', minWidth: 160, overflow: 'hidden' }}>
-          <button onClick={(e) => { e.stopPropagation(); setOpen(false); onDelete() }}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 14, color: '#ff3b30', fontWeight: 500 }}>
-            🗑️ {label}
-          </button>
-        </div>,
-        document.body
-      )}
-    </>
-  )
-}
 
 const GL = { all: 'Everyone', band: 'Band', vocals: 'Vocals' }
 
@@ -94,13 +55,17 @@ function RehearsalSheet({ open, onClose, onSave, onDelete, rehearsal }) {
   const [group,    setGroup]    = useState(rehearsal?.group    || 'all')
   const [confirm,  setConfirm]  = useState(false)
   const [busy,     setBusy]     = useState(false)
+  const [error,    setError]    = useState('')
 
   const save = async () => {
     if (!name || !date) return
-    setBusy(true)
-    await onSave({ name, dateStr: formatDate(date), time: formatTime(time), location: location || 'TBD', group, dateTs: new Date(date).getTime() }, rehearsal)
-    setBusy(false)
-    onClose()
+    setBusy(true); setError('')
+    try {
+      await onSave({ name, dateStr: formatDate(date), time: formatTime(time), location: location || 'TBD', group, dateTs: new Date(date).getTime() }, rehearsal)
+      onClose()
+    } catch (e) {
+      setError(e?.message || 'Could not save rehearsal.')
+    } finally { setBusy(false) }
   }
 
   const handleDelete = async () => {
@@ -111,9 +76,7 @@ function RehearsalSheet({ open, onClose, onSave, onDelete, rehearsal }) {
   }
 
   return (
-    <BottomSheet open={open} onClose={onClose} title={isEdit ? 'Edit Rehearsal' : 'Add Rehearsal'}
-      key={rehearsal?.id || 'new-r'}
-      action={isEdit ? <DeleteMenu label="Delete Rehearsal" onDelete={() => setConfirm(true)} /> : null}>
+    <BottomSheet open={open} onClose={onClose} title={isEdit ? 'Edit Rehearsal' : 'Add Rehearsal'} key={rehearsal?.id || 'new-r'}>
       <div className="form-row">
         <label className="form-label">Name</label>
         <input className="form-input" placeholder="e.g. Sunday Service Prep" value={name} onChange={e => setName(e.target.value)} />
@@ -140,13 +103,20 @@ function RehearsalSheet({ open, onClose, onSave, onDelete, rehearsal }) {
           <option value="vocals">Vocals Only</option>
         </select>
       </div>
+      {error && <div className="schedule-form-error">{error}</div>}
       <button className="btn-primary" disabled={busy || !name || !date} onClick={save}>
         {busy ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Rehearsal'}
       </button>
-      {confirm && (
-        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setConfirm(false)}>Cancel</button>
-          <button className="btn-danger" style={{ flex: 1 }} onClick={handleDelete} disabled={busy}>Delete</button>
+      {isEdit && (
+        <div style={{ marginTop: 12 }}>
+          {confirm ? (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setConfirm(false)}>Cancel</button>
+              <button className="btn-danger" style={{ flex: 1 }} onClick={handleDelete} disabled={busy}>Delete</button>
+            </div>
+          ) : (
+            <button className="btn-danger" onClick={() => setConfirm(true)}>Delete Rehearsal</button>
+          )}
         </div>
       )}
     </BottomSheet>
@@ -259,6 +229,7 @@ function ServiceSheet({ open, onClose, onSave, onDelete, service, members }) {
   })
   const [confirm, setConfirm] = useState(false)
   const [busy,    setBusy]    = useState(false)
+  const [error,   setError]   = useState('')
 
   const hasPraiseOrWorshipAssignee =
       (sections.Praise?.length || 0) > 0 || (sections.Worship?.length || 0) > 0
@@ -287,10 +258,13 @@ function ServiceSheet({ open, onClose, onSave, onDelete, service, members }) {
 
   const save = async () => {
     if (!date) return
-    setBusy(true)
-    await onSave({ dateStr: formatDate(date), dateTs: new Date(date).getTime(), sections }, service)
-    setBusy(false)
-    onClose()
+    setBusy(true); setError('')
+    try {
+      await onSave({ dateStr: formatDate(date), dateTs: new Date(date).getTime(), sections }, service)
+      onClose()
+    } catch (e) {
+      setError(e?.message || 'Could not save service.')
+    } finally { setBusy(false) }
   }
 
   const handleDelete = async () => {
@@ -301,9 +275,7 @@ function ServiceSheet({ open, onClose, onSave, onDelete, service, members }) {
   }
 
   return (
-    <BottomSheet open={open} onClose={onClose} title={isEdit ? 'Edit Service' : 'Add Service'}
-      key={service?.id || 'new-s'}
-      action={isEdit ? <DeleteMenu label="Delete Service" onDelete={() => setConfirm(true)} /> : null}>
+    <BottomSheet open={open} onClose={onClose} title={isEdit ? 'Edit Service' : 'Add Service'} key={service?.id || 'new-s'}>
       <div className="form-row">
         <label className="form-label">Date</label>
         <input className="form-input" type="date" value={date} onChange={e => setDate(e.target.value)} />
@@ -330,20 +302,28 @@ function ServiceSheet({ open, onClose, onSave, onDelete, service, members }) {
         )
       })}
 
+      {error && <div className="schedule-form-error">{error}</div>}
       <button className="btn-primary" style={{ marginTop: 8 }} disabled={busy || !date} onClick={save}>
         {busy ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Service'}
       </button>
-      {confirm && (
-        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setConfirm(false)}>Cancel</button>
-          <button className="btn-danger" style={{ flex: 1 }} onClick={handleDelete} disabled={busy}>Delete</button>
+
+      {isEdit && (
+        <div style={{ marginTop: 12 }}>
+          {confirm ? (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setConfirm(false)}>Cancel</button>
+              <button className="btn-danger" style={{ flex: 1 }} onClick={handleDelete} disabled={busy}>Delete</button>
+            </div>
+          ) : (
+            <button className="btn-danger" onClick={() => setConfirm(true)}>Delete Service</button>
+          )}
         </div>
       )}
     </BottomSheet>
   )
 }
 
-function ServiceCard({ service, members, canManage, onEdit, currentUserId }) {
+function ServiceCard({ service, members, canManage, onEdit, currentUserId, setlistLookup, onViewSetlist }) {
   const memberMap = Object.fromEntries(members.map(m => [m.id, m]))
 
   const hasPraiseOrWorshipAssignee =
@@ -398,14 +378,18 @@ function ServiceCard({ service, members, canManage, onEdit, currentUserId }) {
                 ? '1px solid var(--border)' : 'none',
             }}>
               <div style={{
-                fontSize: 12,
-                fontWeight: 600,
-                color: iAmHere ? 'var(--accent)' : 'var(--text3)',
-                width: 110,
+                width: 116,
                 flexShrink: 0,
-                paddingTop: 4,
+                paddingTop: 2,
               }}>
-                {sec}
+                <div style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: iAmHere ? 'var(--accent)' : 'var(--text3)',
+                  marginBottom: 5,
+                }}>
+                  {sec}
+                </div>
               </div>
 
               {assignees.length === 0 ? (
@@ -439,6 +423,15 @@ function ServiceCard({ service, members, canManage, onEdit, currentUserId }) {
                       </span>
                     </div>
                   ))}
+                  {setlistLookup.get(`${service.id}::${sec}`) && (
+                    <button
+                      type="button"
+                      className="schedule-setlist-btn"
+                      onClick={() => onViewSetlist(setlistLookup.get(`${service.id}::${sec}`))}
+                    >
+                      ♫ Set List
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -458,6 +451,9 @@ export default function Schedule({ showAdd, onAddClose }) {
   const { services,   loading: sLoading, addService,   updateService,   deleteService }               = useServices()
   const { user, isAdmin, profile } = useAuth()
   const members = useMembers()
+  const { setlists, deleteSetlist } = useSetlists()
+  const setlistLookup = useSetlistLookup(setlists)
+  const [viewingSetlist, setViewingSetlist] = useState(null)
 
   const [activeTab,      setActiveTab]      = useState('rehearsals')  // 'rehearsals' | 'services'
   const [editingR,       setEditingR]       = useState(null)
@@ -536,7 +532,8 @@ export default function Schedule({ showAdd, onAddClose }) {
           ) : (
             services.map(s => (
               <ServiceCard key={s.id} service={s} members={members}
-                canManage={canManage} onEdit={setEditingS} currentUserId={user?.uid} />
+                canManage={canManage} onEdit={setEditingS} currentUserId={user?.uid}
+                setlistLookup={setlistLookup} onViewSetlist={setViewingSetlist} />
             ))
           )}
 
@@ -550,6 +547,17 @@ export default function Schedule({ showAdd, onAddClose }) {
           )}
         </>
       )}
+
+      <SetlistViewer
+        setlist={viewingSetlist}
+        onClose={() => setViewingSetlist(null)}
+        canDelete={!!viewingSetlist && (isAdmin || viewingSetlist.createdBy === user?.uid) && (viewingSetlist.serviceDateTs || 0) >= new Date().setHours(0, 0, 0, 0)}
+        onDelete={async () => {
+          if (!viewingSetlist || !window.confirm('Delete this set list? This will unassign it from the service.')) return
+          await deleteSetlist(viewingSetlist)
+          setViewingSetlist(null)
+        }}
+      />
     </>
   )
 }
