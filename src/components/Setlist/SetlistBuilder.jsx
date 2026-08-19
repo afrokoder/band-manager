@@ -11,7 +11,7 @@ import { uploadMediaFile } from '../../utils/mediaUpload'
 import BottomSheet from '../ui/BottomSheet'
 import SongMediaFields from '../Songs/SongMediaFields'
 
-const ELIGIBLE_SECTIONS = ['Praise', 'Worship', 'Praise & Worship']
+const ELIGIBLE_SECTIONS = ['Praise', 'Worship']
 const KEYS = ['A', 'Bb', 'B', 'C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab']
 const TAGS = ['slow', 'medium', 'upbeat', 'anthem']
 const COLORS = ['#6366f1','#ec4899','#f59e0b','#10b981','#8b5cf6','#ef4444','#0ea5e9','#f97316','#06b6d4','#84cc16']
@@ -303,6 +303,12 @@ export default function SetlistBuilder({ showAdd, onAddClose }) {
   const futureServices = useMemo(() => services.filter(s => (s.dateTs || 0) >= today.getTime()), [services])
   const availableSections = useMemo(() => {
     if (!selectedService) return []
+
+    // A combined Praise & Worship assignment represents two independent set-list slots.
+    // This lets the same assigned team create one Praise set list and one Worship set list.
+    const hasCombinedAssignment = (selectedService.sections?.['Praise & Worship'] || []).length > 0
+    if (hasCombinedAssignment) return ['Praise', 'Worship']
+
     return ELIGIBLE_SECTIONS.filter(name => (selectedService.sections?.[name] || []).length > 0)
   }, [selectedService])
   const publishedForSection = (name) => setlists.find(item =>
@@ -405,7 +411,7 @@ export default function SetlistBuilder({ showAdd, onAddClose }) {
       <BottomSheet open={creating} onClose={closeBuilder} title={editing ? 'Edit Set List' : 'Create Set List'} subtitle={`Step ${step} of 4 · ${STEPS[step - 1]}`}>
         <Stepper step={step} />
         {step === 1 && <>
-          <div className="setlist-builder-heading">Service & Section</div><p className="setlist-builder-subtext">Only music sections that actually have an assignee on the selected service can receive a set list.</p>
+          <div className="setlist-builder-heading">Service & Section</div><p className="setlist-builder-subtext">Only music sections that actually have an assignee on the selected service can receive a set list. A Praise & Worship assignment has two separate set-list slots: Praise and Worship.</p>
           <div className="form-row"><label className="form-label">Service</label><select className="form-select" value={serviceId} onChange={e => setServiceId(e.target.value)}><option value="">Select a service…</option>{futureServices.map(service => <option key={service.id} value={service.id}>{service.dateStr}</option>)}</select></div>
           {serviceId && <div className="form-row"><label className="form-label">Assigned section</label>{availableSections.length ? <div className="setlist-section-grid">{availableSections.map(item => {
               const occupied = publishedForSection(item)
