@@ -1,8 +1,8 @@
-import { useRef, useState } from 'react'
+import { isValidElement, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 /**
- * action?: { label: string, onPress: () => void }
- * Shows a tappable label on the right side of the sheet header (before the ✕ close button).
+ * action — either { label, onPress } object OR any ReactNode (e.g. a ··· menu)
  */
 export default function BottomSheet({ open, onClose, title, subtitle, action, children }) {
   const sheetRef = useRef(null)
@@ -12,6 +12,14 @@ export default function BottomSheet({ open, onClose, title, subtitle, action, ch
   const [dragOffset, setDragOffset] = useState(0)
   const [dragging, setDragging] = useState(false)
   const [closing, setClosing] = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      setDragOffset(0)
+      setDragging(false)
+      setClosing(false)
+    }
+  }, [open])
 
   const beginDrag = (event) => {
     if (closing) return
@@ -25,9 +33,7 @@ export default function BottomSheet({ open, onClose, title, subtitle, action, ch
 
   const moveDrag = (event) => {
     if (!dragging || event.pointerId !== activePointerId.current) return
-
-    const nextOffset = Math.max(0, event.clientY - dragStartY.current)
-    setDragOffset(nextOffset)
+    setDragOffset(Math.max(0, event.clientY - dragStartY.current))
   }
 
   const finishDrag = (event) => {
@@ -44,7 +50,11 @@ export default function BottomSheet({ open, onClose, title, subtitle, action, ch
       setClosing(true)
       const sheetHeight = sheetRef.current?.offsetHeight || window.innerHeight
       setDragOffset(sheetHeight)
-      window.setTimeout(onClose, 220)
+      window.setTimeout(() => {
+        onClose()
+        setDragOffset(0)
+        setClosing(false)
+      }, 220)
     } else {
       setDragOffset(0)
     }
@@ -64,7 +74,18 @@ export default function BottomSheet({ open, onClose, title, subtitle, action, ch
       }
     : undefined
 
-  return (
+  const actionNode = action
+    ? isValidElement(action)
+      ? action
+      : (
+        <button onClick={action.onPress}
+          style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 14, fontWeight: 600, cursor: 'pointer', padding: '4px 2px' }}>
+          {action.label}
+        </button>
+      )
+    : null
+
+  const sheet = (
     <div className={`overlay ${open ? 'open' : ''}`} onClick={onClose}>
       <div
         ref={sheetRef}
@@ -96,12 +117,7 @@ export default function BottomSheet({ open, onClose, title, subtitle, action, ch
             {subtitle && <div className="sheet-subtitle">{subtitle}</div>}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {action && (
-              <button onClick={action.onPress}
-                style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 14, fontWeight: 600, cursor: 'pointer', padding: '4px 2px' }}>
-                {action.label}
-              </button>
-            )}
+            {actionNode}
             <button className="sheet-close" onClick={onClose}>✕</button>
           </div>
         </div>
@@ -109,4 +125,8 @@ export default function BottomSheet({ open, onClose, title, subtitle, action, ch
       </div>
     </div>
   )
+
+  // Render sheets at document.body so they cannot be clipped by the app's
+  // scroll container or appear underneath the persistent tab bar on iOS.
+  return createPortal(sheet, document.body)
 }
