@@ -423,7 +423,28 @@ function ServiceCard({ service, members, canManage, onEdit, currentUserId, setli
                       </span>
                     </div>
                   ))}
-                  {setlistLookup.get(`${service.id}::${sec}`) && (
+                  {sec === 'Praise & Worship' ? (
+                    <>
+                      {setlistLookup.get(`${service.id}::Praise`) && (
+                        <button
+                          type="button"
+                          className="schedule-setlist-btn"
+                          onClick={() => onViewSetlist(setlistLookup.get(`${service.id}::Praise`))}
+                        >
+                          ♫ Praise Set List
+                        </button>
+                      )}
+                      {setlistLookup.get(`${service.id}::Worship`) && (
+                        <button
+                          type="button"
+                          className="schedule-setlist-btn"
+                          onClick={() => onViewSetlist(setlistLookup.get(`${service.id}::Worship`))}
+                        >
+                          ♫ Worship Set List
+                        </button>
+                      )}
+                    </>
+                  ) : setlistLookup.get(`${service.id}::${sec}`) ? (
                     <button
                       type="button"
                       className="schedule-setlist-btn"
@@ -431,7 +452,7 @@ function ServiceCard({ service, members, canManage, onEdit, currentUserId, setli
                     >
                       ♫ Set List
                     </button>
-                  )}
+                  ) : null}
                 </div>
               )}
             </div>
