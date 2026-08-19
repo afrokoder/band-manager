@@ -71,13 +71,13 @@ export default function App() {
       {/* Content */}
       <main className="content">
         <div className={`section ${tab === 'songs'    ? 'active' : ''}`}>
-          <SongLibrary showAdd={showAdd} onAddClose={() => setShowAdd(false)} />
+          <SongLibrary showAdd={showAdd && tab === 'songs'} onAddClose={() => setShowAdd(false)} />
         </div>
         <div className={`section ${tab === 'setlist'  ? 'active' : ''}`}>
-          <SetlistBuilder showAdd={showAdd} onAddClose={() => setShowAdd(false)} />
+          <SetlistBuilder showAdd={showAdd && tab === 'setlist'} onAddClose={() => setShowAdd(false)} />
         </div>
         <div className={`section ${tab === 'schedule' ? 'active' : ''}`}>
-          <Schedule showAdd={showAdd} onAddClose={() => setShowAdd(false)} />
+          <Schedule showAdd={showAdd && tab === 'schedule'} onAddClose={() => setShowAdd(false)} />
         </div>
         <div className={`section ${tab === 'comms'    ? 'active' : ''}`}>
           <Comms onNewMessage={(msg) => setBanner(msg)} />
