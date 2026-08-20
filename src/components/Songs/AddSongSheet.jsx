@@ -56,9 +56,12 @@ export default function AddSongSheet({ open, onClose, onSave, song: editSong }) 
   const delSection = (i) => setSections(s => s.filter((_, j) => j !== i))
 
   const ytVideoId = extractYouTubeId(ytUrl)
+  const hasLyrics = sections.some(section => section.lyrics?.trim())
+  const hasMedia = !!(ytVideoId || attachment || voiceMemo || editSong?.attachment || editSong?.voiceMemo || editSong?.fileUrl)
+  const canSubmit = !!title.trim() && hasMedia && hasLyrics
 
   const submit = async () => {
-    if (!title.trim()) return
+    if (!canSubmit) return
     setBusy(true)
     try {
       const [uploadedAttachment, uploadedVoiceMemo] = await Promise.all([
@@ -93,7 +96,7 @@ export default function AddSongSheet({ open, onClose, onSave, song: editSong }) 
   return (
     <BottomSheet open={open} onClose={onClose} title={isEdit ? 'Edit Song' : 'Add Song'}>
       <div className="form-row">
-        <label className="form-label">Title</label>
+        <label className="form-label">Title <span style={{ color: 'var(--danger)' }}>*</span></label>
         <input className="form-input" placeholder="Song title" value={title} onChange={e => setTitle(e.target.value)} />
       </div>
 
@@ -121,7 +124,7 @@ export default function AddSongSheet({ open, onClose, onSave, song: editSong }) 
 
       {/* YouTube link */}
       <div className="form-row">
-        <label className="form-label">YouTube Link <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(optional)</span></label>
+        <label className="form-label">YouTube Link <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(YouTube link, attachment, or voice memo required)</span></label>
         <input className="form-input" placeholder="https://youtu.be/..." value={ytUrl}
           onChange={e => setYtUrl(e.target.value)} />
         {ytUrl && !ytVideoId && (
@@ -146,12 +149,18 @@ export default function AddSongSheet({ open, onClose, onSave, song: editSong }) 
         voiceMemo={voiceMemo}
         onAttachmentChange={setAttachment}
         onVoiceMemoChange={setVoiceMemo}
+        requireOne
       />
+      {!hasMedia && (
+        <p style={{ fontSize: 12, color: 'var(--danger)', margin: '-6px 0 14px' }}>
+          Add a valid YouTube link, attach a file, or record a voice memo.
+        </p>
+      )}
 
       {/* Sections */}
       <div style={{ marginBottom: 14 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <span className="form-label" style={{ marginBottom: 0 }}>Sections (Verse / Chorus / Bridge)</span>
+          <span className="form-label" style={{ marginBottom: 0 }}>Sections / Lyrics <span style={{ color: 'var(--danger)' }}>*</span></span>
           <button onClick={addSection} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 13, cursor: 'pointer', fontWeight: 500 }}>+ Add</button>
         </div>
         {sections.map((sec, i) => (
@@ -169,13 +178,19 @@ export default function AddSongSheet({ open, onClose, onSave, song: editSong }) 
         ))}
       </div>
 
+      {!hasLyrics && (
+        <p style={{ fontSize: 12, color: 'var(--danger)', margin: '-6px 0 14px' }}>
+          Lyrics are required. Add lyrics to at least one section.
+        </p>
+      )}
+
       <div className="form-row">
         <label className="form-label">Notes (optional)</label>
         <textarea className="form-textarea" rows={2} placeholder="e.g. Capo 2, transpose for vocalists, tempo notes…"
           value={notes} onChange={e => setNotes(e.target.value)} />
       </div>
 
-      <button className="btn-primary" disabled={busy || !title.trim()} onClick={submit}>
+      <button className="btn-primary" disabled={busy || !canSubmit} onClick={submit}>
         {busy ? 'Saving…' : isEdit ? 'Save Changes' : 'Add to Library'}
       </button>
     </BottomSheet>
