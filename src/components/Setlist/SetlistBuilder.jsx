@@ -71,6 +71,9 @@ function ManualSongForm({ onAdd, userId }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const videoId = extractYouTubeId(ytUrl)
+  const hasLyrics = sections.some(section => section.lyrics?.trim())
+  const hasMedia = !!(videoId || attachment || voiceMemo)
+  const canAdd = !!title.trim() && hasMedia && hasLyrics
 
   const reset = () => {
     setTitle(''); setKey('D'); setBpm(''); setTag('slow'); setNotes('')
@@ -78,7 +81,10 @@ function ManualSongForm({ onAdd, userId }) {
   }
 
   const submit = async () => {
-    if (!title.trim()) return
+    if (!canAdd) {
+      setError('Title, lyrics, and either a valid YouTube link, attached file, or voice memo are required.')
+      return
+    }
     setBusy(true); setError('')
     try {
       const [uploadedAttachment, uploadedVoiceMemo] = await Promise.all([
@@ -109,21 +115,22 @@ function ManualSongForm({ onAdd, userId }) {
 
   return (
     <div className="setlist-manual-card">
-      <div className="form-row"><label className="form-label">Title</label><input className="form-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="Song title" /></div>
+      <div className="form-row"><label className="form-label">Title <span style={{ color: 'var(--danger)' }}>*</span></label><input className="form-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="Song title" /></div>
       <div className="setlist-two-col">
         <div className="form-row"><label className="form-label">Key</label><select className="form-select" value={key} onChange={e => setKey(e.target.value)}>{KEYS.map(item => <option key={item}>{item}</option>)}</select></div>
         <div className="form-row"><label className="form-label">BPM</label><input className="form-input" type="number" value={bpm} onChange={e => setBpm(e.target.value)} placeholder="72" /></div>
       </div>
       <div className="form-row"><label className="form-label">Mood</label><div className="chips">{TAGS.map(item => <button type="button" key={item} className={`chip ${tag === item ? 'active' : ''}`} onClick={() => setTag(item)}>{item}</button>)}</div></div>
       <div className="form-row">
-        <label className="form-label">YouTube Link <span className="optional">(optional)</span></label>
+        <label className="form-label">YouTube Link <span className="optional">(YouTube link, attachment, or voice memo required)</span></label>
         <input className="form-input" value={ytUrl} onChange={e => setYtUrl(e.target.value)} placeholder="https://youtu.be/..." />
         {ytUrl && !videoId && <div className="setlist-link-help error">That does not look like a YouTube link yet.</div>}
         {videoId && <div className="setlist-manual-preview"><img src={youtubeThumbnail(videoId)} alt="YouTube preview" /><span>Link ready</span></div>}
       </div>
-      <SongMediaFields attachment={attachment} voiceMemo={voiceMemo} onAttachmentChange={setAttachment} onVoiceMemoChange={setVoiceMemo} />
+      <SongMediaFields attachment={attachment} voiceMemo={voiceMemo} onAttachmentChange={setAttachment} onVoiceMemoChange={setVoiceMemo} requireOne />
+      {!hasMedia && <div className="setlist-link-help error">Add a valid YouTube link, attach a file, or record a voice memo.</div>}
       <div className="setlist-manual-sections">
-        <div className="between"><span className="form-label">Sections (Verse / Chorus / Bridge)</span><button className="setlist-text-btn" type="button" onClick={() => setSections(items => [...items, emptySongSection()])}>+ Add</button></div>
+        <div className="between"><span className="form-label">Sections / Lyrics <span style={{ color: 'var(--danger)' }}>*</span></span><button className="setlist-text-btn" type="button" onClick={() => setSections(items => [...items, emptySongSection()])}>+ Add</button></div>
         {sections.map((sec, i) => (
           <div className="setlist-manual-section" key={i}>
             {sections.length > 1 && <button className="setlist-section-x" type="button" onClick={() => setSections(items => items.filter((_, index) => index !== i))}>✕</button>}
@@ -133,9 +140,10 @@ function ManualSongForm({ onAdd, userId }) {
           </div>
         ))}
       </div>
+      {!hasLyrics && <div className="setlist-link-help error">Lyrics are required. Add lyrics to at least one section.</div>}
       <div className="form-row"><label className="form-label">Notes <span className="optional">(optional)</span></label><textarea className="form-textarea" rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Capo, arrangement, vocal notes…" /></div>
       {error && <div className="setlist-error">{error}</div>}
-      <button className="btn-primary" type="button" disabled={busy || !title.trim()} onClick={submit}>{busy ? 'Adding…' : 'Add to Library & Set List'}</button>
+      <button className="btn-primary" type="button" disabled={busy || !canAdd} onClick={submit}>{busy ? 'Adding…' : 'Add to Library & Set List'}</button>
     </div>
   )
 }

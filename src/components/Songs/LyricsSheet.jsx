@@ -88,6 +88,12 @@ export default function LyricsSheet({ song, onClose, onDelete, onEdit }) {
         </div>
       )}
 
+      {/* Added by */}
+      <div className="song-added-by">
+        <span>Added by</span>
+        <strong>{song.addedByName || 'Team member'}</strong>
+      </div>
+
       {/* Delete */}
       {onDelete && (
         <div style={{ marginTop: 24 }}>

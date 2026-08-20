@@ -56,12 +56,20 @@ service cloud.firestore {
     match /songs/{id} {
       allow read: if authed();
 
-      // Any signed-in user may add a song they created (needed when a song is
-      // added manually while building a set list). Existing songs remain
-      // manager-controlled.
+      // Every signed-in team member can add songs to the shared library.
+      // New songs must be stamped with the authenticated user's uid.
       allow create: if authed()
                     && request.resource.data.addedBy == request.auth.uid;
-      allow update, delete: if canManage();
+
+      // Existing manager behavior is preserved. The person who originally
+      // added the song may also maintain their own song, but ownership cannot
+      // be reassigned during an update.
+      allow update: if authed()
+                    && (canManage() || resource.data.addedBy == request.auth.uid)
+                    && request.resource.data.addedBy == resource.data.addedBy;
+
+      allow delete: if authed()
+                    && (canManage() || resource.data.addedBy == request.auth.uid);
     }
 
     // ── Messages ──────────────────────────────────────────────────────────────

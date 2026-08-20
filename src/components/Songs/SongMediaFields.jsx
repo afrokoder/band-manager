@@ -6,7 +6,7 @@ const prettySize = (bytes = 0) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export default function SongMediaFields({ attachment, voiceMemo, onAttachmentChange, onVoiceMemoChange }) {
+export default function SongMediaFields({ attachment, voiceMemo, onAttachmentChange, onVoiceMemoChange, requireOne = false }) {
   const [recording, setRecording] = useState(false)
   const [recordError, setRecordError] = useState('')
   const [recordSeconds, setRecordSeconds] = useState(0)
@@ -82,7 +82,7 @@ export default function SongMediaFields({ attachment, voiceMemo, onAttachmentCha
   return (
     <div className="song-media-fields">
       <div className="form-row">
-        <label className="form-label">Attachment <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(optional)</span></label>
+        <label className="form-label">Attachment <span style={{ color: 'var(--text3)', fontWeight: 400 }}>{requireOne ? '(one media source required)' : '(optional)'}</span></label>
         <label className="song-file-picker">
           <input type="file" onChange={event => onAttachmentChange(event.target.files?.[0] || null)} />
           <span>⌁</span>
@@ -95,7 +95,7 @@ export default function SongMediaFields({ attachment, voiceMemo, onAttachmentCha
       </div>
 
       <div className="form-row">
-        <label className="form-label">Voice memo <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(optional)</span></label>
+        <label className="form-label">Voice memo <span style={{ color: 'var(--text3)', fontWeight: 400 }}>{requireOne ? '(one media source required)' : '(optional)'}</span></label>
         <div className="song-voice-row">
           <div className="song-record-controls">
             <button type="button" className={`song-record-btn ${recording ? 'recording' : ''}`} onClick={recording ? stopRecording : startRecording}>
