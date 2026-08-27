@@ -297,6 +297,7 @@ export default function SetlistBuilder({ showAdd, onAddClose }) {
   const [attachment, setAttachment] = useState(null)
   const [voiceMemo, setVoiceMemo] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [uploadPct, setUploadPct] = useState(null)
   const [saveError, setSaveError] = useState('')
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 5 } }))
@@ -350,9 +351,10 @@ export default function SetlistBuilder({ showAdd, onAddClose }) {
   }
 
   const buildPayload = async (status) => {
+    const onUploadProgress = fraction => setUploadPct(Math.round(fraction * 100))
     const [uploadedAttachment, uploadedVoiceMemo] = await Promise.all([
-      attachment ? uploadMediaFile(attachment, user?.uid, 'setlists') : Promise.resolve(null),
-      voiceMemo ? uploadMediaFile(voiceMemo, user?.uid, 'setlists') : Promise.resolve(null),
+      attachment ? uploadMediaFile(attachment, user?.uid, 'setlists', onUploadProgress) : Promise.resolve(null),
+      voiceMemo ? uploadMediaFile(voiceMemo, user?.uid, 'setlists', onUploadProgress) : Promise.resolve(null),
     ])
     return {
       serviceId, serviceDateStr: selectedService?.dateStr || editing?.serviceDateStr || '', serviceDateTs: selectedService?.dateTs || editing?.serviceDateTs || 0,
@@ -367,7 +369,7 @@ export default function SetlistBuilder({ showAdd, onAddClose }) {
 
   const save = async status => {
     if (!serviceId || !section || selectedSongs.length === 0) return
-    setBusy(true); setSaveError('')
+    setBusy(true); setUploadPct(null); setSaveError('')
     try {
       const data = await buildPayload(status)
       if (editing) await updateSetlist(editing.id, data, editing)
@@ -375,7 +377,7 @@ export default function SetlistBuilder({ showAdd, onAddClose }) {
       setCreating(false); resetBuilder(); setTab(status === 'draft' ? 'drafts' : 'upcoming')
     } catch (e) {
       console.error(e); setSaveError(e?.message || 'Could not save this set list.')
-    } finally { setBusy(false) }
+    } finally { setBusy(false); setUploadPct(null) }
   }
 
   const canManageItem = item => (isAdmin || item.createdBy === myId) && (item.serviceDateTs || 0) >= today.getTime()
@@ -453,7 +455,10 @@ export default function SetlistBuilder({ showAdd, onAddClose }) {
 
         <div className="setlist-builder-footer">
           {step > 1 && <button className="btn-secondary" type="button" onClick={() => setStep(value => value - 1)}>Back</button>}
-          {step < 4 ? <button className="btn-primary" type="button" disabled={!canGoNext} onClick={() => setStep(value => value + 1)}>Next</button> : isPublished(editing?.status) ? <button className="btn-primary" type="button" disabled={busy} onClick={() => save('published')}>{busy ? 'Saving…' : 'Save Changes'}</button> : <><button className="btn-secondary" type="button" disabled={busy} onClick={() => save('draft')}>Save Draft</button><button className="btn-primary" type="button" disabled={busy} onClick={() => save('published')}>{busy ? 'Saving…' : 'Publish Set List'}</button></>}
+          {(() => {
+            const savingLabel = uploadPct != null ? `Uploading… ${uploadPct}%` : 'Saving…'
+            return step < 4 ? <button className="btn-primary" type="button" disabled={!canGoNext} onClick={() => setStep(value => value + 1)}>Next</button> : isPublished(editing?.status) ? <button className="btn-primary" type="button" disabled={busy} onClick={() => save('published')}>{busy ? savingLabel : 'Save Changes'}</button> : <><button className="btn-secondary" type="button" disabled={busy} onClick={() => save('draft')}>{busy ? savingLabel : 'Save Draft'}</button><button className="btn-primary" type="button" disabled={busy} onClick={() => save('published')}>{busy ? savingLabel : 'Publish Set List'}</button></>
+          })()}
         </div>
       </BottomSheet>
 
