@@ -12,12 +12,19 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
+    // Membership checks honor both the `groups` array and the legacy singular
+    // `group` field so profiles created before the multi-group migration keep
+    // their access. This mirrors the client (AuthContext) admin/group logic.
     function isAdmin() {
-      return authed() && 'admin' in userDoc().get('groups', []);
+      return authed()
+             && ('admin' in userDoc().get('groups', [])
+                 || userDoc().get('group', '') == 'admin');
     }
 
     function inGroup(group) {
-      return authed() && group in userDoc().get('groups', []);
+      return authed()
+             && (group in userDoc().get('groups', [])
+                 || userDoc().get('group', '') == group);
     }
 
     // Admin OR band member can manage content
