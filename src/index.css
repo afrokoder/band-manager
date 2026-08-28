@@ -523,3 +523,124 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); -web
 }
 .song-added-by span { font-size: 12px; color: var(--text3); }
 .song-added-by strong { font-size: 13px; font-weight: 600; color: var(--text2); text-align: right; }
+
+/* ── Schedule redesign ─────────────────────────────────────────────────────── */
+.schedule-page-head { display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin-bottom:14px; }
+.schedule-page-head .page-title { display:block; margin-bottom:3px; }
+.schedule-page-head p { margin:0; color:var(--text2); font-size:13px; line-height:1.4; }
+.schedule-tabs { display:grid; grid-template-columns:1fr 1fr; gap:4px; padding:4px; margin-bottom:16px; background:rgba(118,118,128,0.12); border-radius:14px; }
+.schedule-tab { min-height:38px; border:0; border-radius:11px; background:transparent; color:var(--text2); font:600 13px var(--font); cursor:pointer; }
+.schedule-tab.active { background:var(--surface); color:var(--text1); box-shadow:0 1px 4px rgba(0,0,0,0.09); }
+
+.schedule-rehearsal-card,
+.schedule-service-card { position:relative; margin-bottom:14px; background:var(--surface); border:1px solid rgba(0,0,0,0.045); border-radius:20px; overflow:hidden; box-shadow:0 5px 18px rgba(0,0,0,0.055); }
+.schedule-card-head { display:flex; align-items:flex-start; gap:11px; padding:15px 14px 13px; }
+.schedule-card-datebox { width:48px; min-width:48px; height:53px; border-radius:14px; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(0,113,227,0.09); color:var(--accent); }
+.schedule-card-datebox span { font-size:9px; font-weight:750; letter-spacing:.7px; text-transform:uppercase; }
+.schedule-card-datebox strong { font-family:var(--font-d); font-size:22px; line-height:1; margin-top:2px; }
+.schedule-card-title-wrap { min-width:0; flex:1; padding-top:1px; }
+.schedule-card-eyebrow { color:var(--accent); font-size:9px; font-weight:800; letter-spacing:.85px; }
+.schedule-card-title { margin-top:3px; font-family:var(--font-d); font-size:16px; font-weight:700; letter-spacing:-.35px; text-transform:capitalize; }
+.schedule-card-meta { margin-top:4px; color:var(--text2); font-size:11px; line-height:1.35; }
+.schedule-card-actions { display:flex; align-items:center; gap:5px; }
+.schedule-edit-btn { width:31px; height:31px; display:grid; place-items:center; border:1px solid var(--border); border-radius:10px; background:var(--bg); color:var(--text2); font-size:15px; cursor:pointer; }
+
+.rsvp-submit-panel { margin:0 14px 14px; padding:12px; border-radius:15px; background:var(--bg); border:1px solid rgba(0,0,0,0.045); }
+.rsvp-submit-title { font-size:12px; font-weight:750; color:var(--text1); }
+.rsvp-submit-help { margin-top:2px; font-size:10px; color:var(--text3); }
+.rsvp-submit-buttons { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; margin-top:10px; }
+.rsvp-submit-btn { min-height:36px; display:flex; align-items:center; justify-content:center; gap:5px; border:1px solid var(--border); border-radius:11px; background:var(--surface); color:var(--text2); font:650 11px var(--font); cursor:pointer; }
+.rsvp-submit-btn span { width:17px; height:17px; display:grid; place-items:center; border-radius:50%; background:rgba(118,118,128,.12); font-size:10px; }
+.rsvp-submit-btn.confirmed.selected { border-color:rgba(52,199,89,.35); background:rgba(52,199,89,.11); color:#1a7f37; }
+.rsvp-submit-btn.declined.selected { border-color:rgba(255,59,48,.32); background:rgba(255,59,48,.09); color:#b42318; }
+.rsvp-submit-btn.maybe.selected { border-color:rgba(255,149,0,.35); background:rgba(255,149,0,.1); color:#9a5b00; }
+
+.rsvp-roster { padding:0 14px 15px; }
+.rsvp-group-block + .rsvp-group-block { margin-top:14px; padding-top:14px; border-top:1px solid var(--border); }
+.rsvp-group-heading { display:flex; align-items:center; justify-content:space-between; margin-bottom:7px; }
+.rsvp-group-heading span:first-child { font-size:12px; font-weight:800; color:var(--text1); }
+.rsvp-group-heading span:last-child { font-size:10px; color:var(--text3); }
+.rsvp-summary-row { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:9px; }
+.rsvp-summary { padding:3px 7px; border-radius:99px; font-size:9px; font-weight:700; }
+.rsvp-summary.confirmed { background:rgba(52,199,89,.11); color:#1a7f37; }
+.rsvp-summary.maybe { background:rgba(255,149,0,.1); color:#9a5b00; }
+.rsvp-summary.declined { background:rgba(255,59,48,.09); color:#b42318; }
+.rsvp-summary.none { background:rgba(118,118,128,.1); color:var(--text3); }
+.rsvp-member-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+.rsvp-member-card { min-width:0; display:flex; align-items:center; gap:7px; padding:7px; border-radius:12px; border:1px solid transparent; background:var(--bg); }
+.rsvp-member-card.confirmed { background:rgba(52,199,89,.07); border-color:rgba(52,199,89,.14); }
+.rsvp-member-card.maybe { background:rgba(255,149,0,.07); border-color:rgba(255,149,0,.14); }
+.rsvp-member-card.declined { background:rgba(255,59,48,.06); border-color:rgba(255,59,48,.12); }
+.rsvp-member-copy { min-width:0; display:flex; flex-direction:column; }
+.rsvp-member-copy strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10.5px; color:var(--text1); }
+.rsvp-member-copy span { margin-top:1px; font-size:9px; color:var(--text3); }
+.rsvp-member-card.confirmed .rsvp-member-copy span { color:#1a7f37; }
+.rsvp-member-card.maybe .rsvp-member-copy span { color:#9a5b00; }
+.rsvp-member-card.declined .rsvp-member-copy span { color:#b42318; }
+
+.schedule-service-card { border-radius:18px; }
+.schedule-service-head { display:flex; align-items:flex-start; gap:10px; padding:15px 16px 9px; }
+.schedule-service-date { font-family:var(--font-d); font-size:17px; font-weight:700; letter-spacing:-.4px; }
+.schedule-service-card.up-next { border:1.5px solid rgba(0,113,227,.32); box-shadow:0 8px 24px rgba(0,113,227,.13); }
+.schedule-service-card.up-next::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--accent); }
+.schedule-service-card.up-next .schedule-service-head { padding-top:34px; background:linear-gradient(180deg, rgba(0,113,227,.08), rgba(0,113,227,0)); }
+.schedule-service-card.up-next .schedule-service-date { color:var(--accent-dark); font-size:19px; }
+.up-next-ribbon { position:absolute; top:10px; left:16px; padding:3px 8px; border-radius:99px; background:var(--accent); color:#fff; font-size:8px; font-weight:850; letter-spacing:.9px; z-index:1; }
+
+@media (max-width: 390px) {
+  .rsvp-member-grid { grid-template-columns:1fr; }
+  .schedule-card-actions { flex-direction:column; align-items:flex-end; }
+  .group-pill { font-size:9px; padding:4px 7px; }
+}
+
+/* Schedule RSVP confirmation refinement */
+.rsvp-confirm-btn {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 10px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #fff;
+  font: 700 12px var(--font);
+  cursor: pointer;
+  transition: opacity .18s ease, transform .18s ease;
+}
+.rsvp-confirm-btn:active:not(:disabled) { transform: scale(.99); }
+.rsvp-confirm-btn:disabled { opacity: .42; cursor: default; }
+.rsvp-submit-message {
+  margin-top: 7px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 650;
+  color: var(--text2);
+}
+
+/* Schedule RSVP edit window + public submission activity */
+.rsvp-member-copy small { margin-top:2px; font-size:8px; line-height:1.2; color:var(--text3); }
+.rsvp-submit-panel.locked { opacity:.82; }
+.rsvp-locked-note { margin-bottom:10px; padding:8px 10px; border-radius:10px; background:rgba(118,118,128,.1); color:var(--text2); font-size:10px; line-height:1.35; }
+.rsvp-submit-btn:disabled { cursor:default; opacity:.62; }
+
+/* Up-next service — stronger visual hierarchy without changing the normal service cards */
+.schedule-service-card.up-next { border:1px solid rgba(0,113,227,.18); box-shadow:0 10px 30px rgba(0,113,227,.12); }
+.schedule-service-card.up-next::before { display:none; }
+.up-next-hero { position:relative; display:flex; align-items:center; gap:13px; padding:16px; background:linear-gradient(135deg, rgba(0,113,227,.12), rgba(0,113,227,.035)); border-bottom:1px solid rgba(0,113,227,.11); }
+.up-next-date-tile { width:62px; min-width:62px; height:70px; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:17px; background:var(--accent); color:#fff; box-shadow:0 6px 15px rgba(0,113,227,.2); }
+.up-next-date-tile span { font-size:9px; font-weight:800; letter-spacing:.8px; text-transform:uppercase; opacity:.9; }
+.up-next-date-tile strong { margin-top:1px; font-family:var(--font-d); font-size:28px; line-height:1; }
+.up-next-date-tile small { margin-top:3px; font-size:9px; font-weight:700; opacity:.9; }
+.up-next-copy { flex:1; min-width:0; }
+.up-next-label { display:flex; align-items:center; gap:5px; color:var(--accent); font-size:9px; font-weight:850; letter-spacing:1px; }
+.up-next-label span { font-size:7px; }
+.up-next-title { margin-top:4px; font-family:var(--font-d); font-size:20px; font-weight:750; letter-spacing:-.45px; color:var(--text1); }
+.up-next-date-line { margin-top:2px; font-size:11px; color:var(--text2); }
+.up-next-assigned { margin-top:6px; width:max-content; max-width:100%; padding:4px 7px; border-radius:8px; background:rgba(0,113,227,.1); color:var(--accent); font-size:9px; font-weight:750; }
+.up-next-edit { align-self:flex-start; flex-shrink:0; background:rgba(255,255,255,.72); }
+
+@media (max-width: 360px) {
+  .up-next-hero { gap:10px; padding:13px; }
+  .up-next-date-tile { width:55px; min-width:55px; height:64px; }
+  .up-next-title { font-size:18px; }
+}
+

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRehearsals, useMembers } from '../../hooks/useRehearsals'
 import { useServices } from '../../hooks/useServices'
 import { useSetlists, useSetlistLookup } from '../../hooks/useSetlists'
@@ -50,7 +50,7 @@ function RehearsalSheet({ open, onClose, onSave, onDelete, rehearsal }) {
   const isEdit = !!rehearsal
   const [name,     setName]     = useState(rehearsal?.name     || '')
   const [date,     setDate]     = useState(rehearsal ? tsToDateInput(rehearsal.dateTs) : '')
-  const [time,     setTime]     = useState(rehearsal ? parseTimeToInput(rehearsal.time) : '')
+  const [time,     setTime]     = useState(rehearsal ? (parseTimeToInput(rehearsal.time) || '10:00') : '10:00')
   const [location, setLocation] = useState(rehearsal?.location !== 'TBD' ? (rehearsal?.location || '') : '')
   const [group,    setGroup]    = useState(rehearsal?.group    || 'all')
   const [confirm,  setConfirm]  = useState(false)
@@ -123,55 +123,178 @@ function RehearsalSheet({ open, onClose, onSave, onDelete, rehearsal }) {
   )
 }
 
-function RehearsalCard({ r, members, onRsvp, onEdit, canManage }) {
-  const { user, profile } = useAuth()
-  const relevant = members.filter(m => {
-    if (r.group === 'all') return true
-    return (m.groups || (m.group ? [m.group] : [])).includes(r.group)
-  })
-  const myRsvp = r.rsvp?.[user?.uid] || 'pending'
+function memberGroups(member) {
+  return member?.groups || (member?.group ? [member.group] : [])
+}
+
+function normalizedRsvp(value) {
+  // Older records stored a string; newer submissions store status + timestamp.
+  const status = typeof value === 'object' && value ? value.status : value
+  if (status === 'pending') return 'maybe'
+  return status || 'none'
+}
+
+function rsvpSubmittedAt(value) {
+  if (!value || typeof value !== 'object') return null
+  return value.submittedAt?.toDate?.() || null
+}
+
+function formatSubmittedAt(value) {
+  const date = rsvpSubmittedAt(value)
+  if (!date) return null
+  return date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
+function rehearsalResponseLockAt(rehearsal) {
+  if (rehearsal.rsvpLockAt?.toDate) return rehearsal.rsvpLockAt.toDate()
+  const d = new Date(rehearsal.dateTs)
+  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0)
+}
+
+const RSVP_META = {
+  confirmed: { label: 'Going', icon: '✓' },
+  declined: { label: "Can't Go", icon: '×' },
+  maybe: { label: 'Maybe', icon: '?' },
+  none: { label: 'No response', icon: '•' },
+}
+
+function RsvpGroup({ title, members, rehearsal }) {
+  if (!members.length) return null
+  const counts = members.reduce((acc, member) => {
+    const status = normalizedRsvp(rehearsal.rsvp?.[member.id])
+    acc[status] = (acc[status] || 0) + 1
+    return acc
+  }, {})
 
   return (
-    <div className="rehearsal-card" style={{ marginBottom: 12 }}>
-      <div className="rehearsal-head">
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="rehearsal-name">{r.name}</div>
-          <div className="rehearsal-meta">{r.dateStr} · {r.time} · {r.location}</div>
+    <div className="rsvp-group-block">
+      <div className="rsvp-group-heading">
+        <span>{title}</span>
+        <span>{members.length} member{members.length === 1 ? '' : 's'}</span>
+      </div>
+      <div className="rsvp-summary-row">
+        <span className="rsvp-summary confirmed">{counts.confirmed || 0} Going</span>
+        <span className="rsvp-summary maybe">{counts.maybe || 0} Maybe</span>
+        <span className="rsvp-summary declined">{counts.declined || 0} Can't Go</span>
+        {!!counts.none && <span className="rsvp-summary none">{counts.none} No response</span>}
+      </div>
+      <div className="rsvp-member-grid">
+        {members.map(member => {
+          const rawRsvp = rehearsal.rsvp?.[member.id]
+          const status = normalizedRsvp(rawRsvp)
+          const submittedAt = formatSubmittedAt(rawRsvp)
+          return (
+            <div key={member.id} className={`rsvp-member-card ${status}`}>
+              <Avatar photoURL={member.photoURL} initial={member.initial} color={member.color} />
+              <div className="rsvp-member-copy">
+                <strong>{member.name}</strong>
+                <span>{RSVP_META[status].icon} {RSVP_META[status].label}</span>
+                {status !== 'none' && (
+                  <small>{submittedAt ? `Submitted ${submittedAt}` : 'Submitted'}</small>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function RehearsalCard({ r, members, onRsvp, onEdit, canManage }) {
+  const { user, profile } = useAuth()
+  const profileGroups = profile?.groups || (profile?.group ? [profile.group] : [])
+  const canRespond = r.group === 'all' || profileGroups.includes(r.group)
+  const myRsvp = normalizedRsvp(r.rsvp?.[user?.uid])
+  const responseLocked = new Date() >= rehearsalResponseLockAt(r)
+  const [selectedRsvp, setSelectedRsvp] = useState(myRsvp === 'none' ? '' : myRsvp)
+  const [submittingRsvp, setSubmittingRsvp] = useState(false)
+  const [rsvpMessage, setRsvpMessage] = useState('')
+
+  useEffect(() => {
+    setSelectedRsvp(myRsvp === 'none' ? '' : myRsvp)
+  }, [myRsvp, r.id])
+
+  const handleSubmitRsvp = async () => {
+    if (!selectedRsvp || !user?.uid) return
+    setSubmittingRsvp(true)
+    setRsvpMessage('')
+    try {
+      await onRsvp(r.id, user.uid, selectedRsvp)
+      setRsvpMessage('Response submitted')
+    } catch (error) {
+      setRsvpMessage(error?.message || 'Could not submit response')
+    } finally {
+      setSubmittingRsvp(false)
+    }
+  }
+
+  const bandMembers = members.filter(m => memberGroups(m).includes('band'))
+  const vocalMembers = members.filter(m => memberGroups(m).includes('vocals'))
+  const showBand = r.group === 'all' || r.group === 'band'
+  const showVocals = r.group === 'all' || r.group === 'vocals'
+
+  return (
+    <div className="schedule-rehearsal-card">
+      <div className="schedule-card-head">
+        <div className="schedule-card-datebox">
+          <span>{r.dateStr?.split(',')[0] || 'Sat'}</span>
+          <strong>{new Date(r.dateTs).getUTCDate()}</strong>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <div className="schedule-card-title-wrap">
+          <div className="schedule-card-eyebrow">REHEARSAL</div>
+          <div className="schedule-card-title">{r.name}</div>
+          <div className="schedule-card-meta">{r.dateStr} · {r.time} · {r.location}</div>
+        </div>
+        <div className="schedule-card-actions">
           <span className={`group-pill ${r.group}`}>{GL[r.group]}</span>
           {canManage && (
-            <button onClick={() => onEdit(r)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px', color: 'var(--text3)', borderRadius: 6 }}>
-              ✏️
-            </button>
+            <button className="schedule-edit-btn" onClick={() => onEdit(r)} aria-label="Edit rehearsal">✎</button>
           )}
         </div>
       </div>
 
-      {(r.group === 'all' || (profile?.groups || [profile?.group]).includes(r.group)) && (
-        <div style={{ padding: '0 16px 10px', display: 'flex', gap: 6 }}>
-          {['confirmed','declined','pending'].map(s => (
-            <button key={s} onClick={() => onRsvp(r.id, user.uid, myRsvp)}
-              style={{
-                padding: '4px 10px', borderRadius: 'var(--r-pill)', fontSize: 11, fontWeight: 600,
-                border: myRsvp === s ? 'none' : '1px solid rgba(0,0,0,0.12)',
-                background: myRsvp === s ? (s === 'confirmed' ? 'var(--success)' : s === 'declined' ? 'var(--danger)' : 'var(--warn)') : 'transparent',
-                color: myRsvp === s ? '#fff' : 'var(--text2)', cursor: 'pointer',
-              }}>
-              {s === 'confirmed' ? '✓ Going' : s === 'declined' ? '✗ Can\'t Go' : '? Maybe'}
-            </button>
-          ))}
+      {canRespond && (
+        <div className={`rsvp-submit-panel ${responseLocked ? 'locked' : ''}`}>
+          {responseLocked && (
+            <div className="rsvp-locked-note">Responses are locked because rehearsal day has started.</div>
+          )}
+          <div>
+            <div className="rsvp-submit-title">Your response</div>
+            <div className="rsvp-submit-help">Choose one option to submit your availability.</div>
+          </div>
+          <div className="rsvp-submit-buttons">
+            {[
+              ['confirmed', '✓', 'Going'],
+              ['declined', '×', "Can't Go"],
+              ['maybe', '?', 'Maybe'],
+            ].map(([status, icon, label]) => (
+              <button
+                type="button"
+                key={status}
+                className={`rsvp-submit-btn ${status} ${selectedRsvp === status ? 'selected' : ''}`}
+                disabled={responseLocked}
+                onClick={() => { setSelectedRsvp(status); setRsvpMessage('') }}
+              >
+                <span>{icon}</span>{label}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="rsvp-confirm-btn"
+            disabled={responseLocked || !selectedRsvp || submittingRsvp || selectedRsvp === myRsvp}
+            onClick={handleSubmitRsvp}
+          >
+            {responseLocked ? 'Responses Closed' : submittingRsvp ? 'Submitting…' : selectedRsvp === myRsvp && myRsvp !== 'none' ? 'Submitted' : 'Submit Response'}
+          </button>
+          {rsvpMessage && <div className="rsvp-submit-message">{rsvpMessage}</div>}
         </div>
       )}
 
-      <div className="member-row">
-        {relevant.map(m => (
-          <div key={m.id} className="member-chip">
-            <Avatar photoURL={m.photoURL} initial={m.initial} color={m.color} />
-            <span>{m.name}</span>
-            <div className={`rsvp-dot ${r.rsvp?.[m.id] || 'pending'}`} />
-          </div>
-        ))}
+      <div className="rsvp-roster">
+        {showBand && <RsvpGroup title="Band" members={bandMembers} rehearsal={r} />}
+        {showVocals && <RsvpGroup title="Vocals" members={vocalMembers} rehearsal={r} />}
       </div>
     </div>
   )
@@ -323,7 +446,7 @@ function ServiceSheet({ open, onClose, onSave, onDelete, service, members }) {
   )
 }
 
-function ServiceCard({ service, members, canManage, onEdit, currentUserId, setlistLookup, onViewSetlist }) {
+function ServiceCard({ service, members, canManage, onEdit, currentUserId, setlistLookup, onViewSetlist, isNext = false }) {
   const memberMap = Object.fromEntries(members.map(m => [m.id, m]))
 
   const hasPraiseOrWorshipAssignee =
@@ -342,25 +465,46 @@ function ServiceCard({ service, members, canManage, onEdit, currentUserId, setli
     (service.sections?.[sec] || []).includes(currentUserId)
   )
 
+  const serviceDate = new Date(service.dateTs)
+  const dayName = DAYS[serviceDate.getUTCDay()]
+  const monthName = MONTHS[serviceDate.getUTCMonth()]
+  const dayNumber = serviceDate.getUTCDate()
+
   return (
-    <div className="rehearsal-card" style={{ marginBottom: 12 }}>
+    <div className={`schedule-service-card ${isNext ? 'up-next' : ''}`}>
       {/* Header */}
-      <div className="rehearsal-head">
-        <div style={{ flex: 1 }}>
-          <div className="rehearsal-name">{service.dateStr}</div>
-          {iAmIn && (
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)', marginTop: 2 }}>
-              ★ You're assigned this Sunday
-            </div>
+      {isNext ? (
+        <div className="up-next-hero">
+          <div className="up-next-date-tile">
+            <span>{monthName}</span>
+            <strong>{dayNumber}</strong>
+            <small>{dayName}</small>
+          </div>
+          <div className="up-next-copy">
+            <div className="up-next-label"><span>●</span> NEXT SERVICE</div>
+            <div className="up-next-title">Sunday Service</div>
+            <div className="up-next-date-line">{service.dateStr}</div>
+            {iAmIn && <div className="up-next-assigned">★ You're assigned to this service</div>}
+          </div>
+          {canManage && (
+            <button className="schedule-edit-btn up-next-edit" onClick={() => onEdit(service)} aria-label="Edit service assignments">✎</button>
           )}
         </div>
-        {canManage && (
-          <button onClick={() => onEdit(service)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px', color: 'var(--text3)', borderRadius: 6 }}>
-            ✏️
-          </button>
-        )}
-      </div>
+      ) : (
+        <div className="schedule-service-head">
+          <div style={{ flex: 1 }}>
+            <div className="schedule-service-date">{service.dateStr}</div>
+            {iAmIn && (
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)', marginTop: 2 }}>
+                ★ You're assigned this Sunday
+              </div>
+            )}
+          </div>
+          {canManage && (
+            <button className="schedule-edit-btn" onClick={() => onEdit(service)} aria-label="Edit service assignments">✎</button>
+          )}
+        </div>
+      )}
 
       {/* Section rows */}
       <div style={{ padding: '4px 16px 14px' }}>
@@ -468,7 +612,7 @@ function ServiceCard({ service, members, canManage, onEdit, currentUserId, setli
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export default function Schedule({ showAdd, onAddClose }) {
-  const { rehearsals, loading: rLoading, addRehearsal, updateRehearsal, deleteRehearsal, toggleRsvp } = useRehearsals()
+  const { rehearsals, loading: rLoading, addRehearsal, updateRehearsal, deleteRehearsal, submitRsvp, ensureMonthlyRehearsals } = useRehearsals()
   const { services,   loading: sLoading, addService,   updateService,   deleteService }               = useServices()
   const { user, isAdmin, profile } = useAuth()
   const members = useMembers()
@@ -480,8 +624,32 @@ export default function Schedule({ showAdd, onAddClose }) {
   const [editingR,       setEditingR]       = useState(null)
   const [editingS,       setEditingS]       = useState(null)
 
-  const isBand    = (profile?.groups || [profile?.group]).includes('band')
-  const canManage = isAdmin || isBand
+  const canManage = isAdmin
+
+  const todayTs = useMemo(() => {
+    const d = new Date()
+    return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())
+  }, [])
+
+  // Only current/future schedule items are shown. Past services and rehearsals
+  // automatically disappear from the Schedule once their calendar date has passed.
+  const visibleServices = useMemo(
+    () => services.filter(service => (service.dateTs || 0) >= todayTs),
+    [services, todayTs]
+  )
+  const visibleRehearsals = useMemo(
+    () => rehearsals.filter(rehearsal => (rehearsal.dateTs || 0) >= todayTs),
+    [rehearsals, todayTs]
+  )
+
+  // Automatic Saturday rehearsals are created idempotently after the previous
+  // month's last Sunday has passed. Admin permissions keep schedule writes controlled.
+  useEffect(() => {
+    if (!isAdmin || rLoading) return
+    ensureMonthlyRehearsals().catch(error => {
+      console.error('Could not auto-create monthly rehearsals:', error)
+    })
+  }, [isAdmin, rLoading])
 
   // ── save handlers ─────────────────────────────────────────────────────────
   const handleSaveR = async (data, rehearsal) => {
@@ -500,36 +668,45 @@ export default function Schedule({ showAdd, onAddClose }) {
     <>
       <span className="page-title">Schedule</span>
 
-      {/* Tab toggle */}
+      {/* Keep the original Schedule section switcher. */}
       <div className="chips" style={{ marginBottom: 16 }}>
         {[['rehearsals','🎵 Rehearsals'], ['services','🎙️ Services']].map(([id, label]) => (
-          <div key={id} className={`chip ${activeTab === id ? 'active' : ''}`}
-            onClick={() => setActiveTab(id)} style={{ flex: 1, textAlign: 'center', cursor: 'pointer' }}>
+          <button
+            type="button"
+            key={id}
+            className={`chip ${activeTab === id ? 'active' : ''}`}
+            onClick={() => setActiveTab(id)}
+            style={{ flex: 1, textAlign: 'center', cursor: 'pointer', border: 0 }}
+          >
             {label}
-          </div>
+          </button>
         ))}
       </div>
+
+
 
       {/* ── Rehearsals tab ── */}
       {activeTab === 'rehearsals' && (
         <>
           {rLoading ? (
             <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><div className="spinner" /></div>
-          ) : rehearsals.length === 0 ? (
+          ) : visibleRehearsals.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state-icon">📅</div>
-              <div className="empty-state-title">No rehearsals yet</div>
-              <div className="empty-state-text">Tap + to schedule your first rehearsal</div>
+              <div className="empty-state-title">No upcoming rehearsals</div>
+              <div className="empty-state-text">Saturday rehearsals will appear automatically for the active month</div>
             </div>
           ) : (
-            rehearsals.map(r => (
-              <RehearsalCard key={r.id} r={r} members={members} onRsvp={toggleRsvp}
+            visibleRehearsals.map(r => (
+              <RehearsalCard key={r.id} r={r} members={members} onRsvp={submitRsvp}
                 canManage={canManage} onEdit={setEditingR} />
             ))
           )}
 
-          <RehearsalSheet open={showAdd && activeTab === 'rehearsals'} onClose={onAddClose}
-            onSave={handleSaveR} onDelete={deleteRehearsal} />
+          {canManage && (
+            <RehearsalSheet open={showAdd && activeTab === 'rehearsals'} onClose={onAddClose}
+              onSave={handleSaveR} onDelete={deleteRehearsal} />
+          )}
           {editingR && (
             <RehearsalSheet open onClose={() => setEditingR(null)}
               onSave={handleSaveR} onDelete={deleteRehearsal} rehearsal={editingR} />
@@ -542,19 +719,19 @@ export default function Schedule({ showAdd, onAddClose }) {
         <>
           {sLoading ? (
             <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><div className="spinner" /></div>
-          ) : services.length === 0 ? (
+          ) : visibleServices.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state-icon">🎙️</div>
               <div className="empty-state-title">No services scheduled</div>
               <div className="empty-state-text">
-                {canManage ? 'Tap + to assign members to upcoming Sundays' : 'No service roster has been set up yet'}
+                {canManage ? 'Tap + to create the next service and assign the team' : 'No upcoming service roster has been set up yet'}
               </div>
             </div>
           ) : (
-            services.map(s => (
+            visibleServices.map((s, index) => (
               <ServiceCard key={s.id} service={s} members={members}
                 canManage={canManage} onEdit={setEditingS} currentUserId={user?.uid}
-                setlistLookup={setlistLookup} onViewSetlist={setViewingSetlist} />
+                setlistLookup={setlistLookup} onViewSetlist={setViewingSetlist} isNext={index === 0} />
             ))
           )}
 
