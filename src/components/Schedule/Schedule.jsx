@@ -446,7 +446,7 @@ function ServiceSheet({ open, onClose, onSave, onDelete, service, members }) {
   )
 }
 
-function ServiceCard({ service, members, canManage, onEdit, currentUserId, setlistLookup, onViewSetlist, isNext = false }) {
+function ServiceCard({ service, members, canManage, onEdit, currentUserId, setlistLookup, onViewSetlist, isNext = false, focused = false }) {
   const memberMap = Object.fromEntries(members.map(m => [m.id, m]))
 
   const hasPraiseOrWorshipAssignee =
@@ -471,7 +471,7 @@ function ServiceCard({ service, members, canManage, onEdit, currentUserId, setli
   const dayNumber = serviceDate.getUTCDate()
 
   return (
-    <div className={`schedule-service-card ${isNext ? 'up-next' : ''}`}>
+    <div data-service-id={service.id} className={`schedule-service-card ${isNext ? 'up-next' : ''} ${focused ? 'notification-focus' : ''}`.trim()}>
       {/* Header */}
       {isNext ? (
         <div className="up-next-hero">
@@ -620,9 +620,11 @@ export default function Schedule({ showAdd, onAddClose }) {
   const setlistLookup = useSetlistLookup(setlists)
   const [viewingSetlist, setViewingSetlist] = useState(null)
 
-  const [activeTab,      setActiveTab]      = useState('rehearsals')  // 'rehearsals' | 'services'
+  const initialServiceId = new URLSearchParams(window.location.search).get('service') || ''
+  const [activeTab,      setActiveTab]      = useState(initialServiceId ? 'services' : 'rehearsals')  // 'rehearsals' | 'services'
   const [editingR,       setEditingR]       = useState(null)
   const [editingS,       setEditingS]       = useState(null)
+  const [focusedServiceId, setFocusedServiceId] = useState(initialServiceId)
 
   const canManage = isAdmin
 
@@ -650,6 +652,26 @@ export default function Schedule({ showAdd, onAddClose }) {
       console.error('Could not auto-create monthly rehearsals:', error)
     })
   }, [isAdmin, rLoading])
+
+
+  // Notification taps can target a specific service. Switch to Services and
+  // scroll the assigned service card into view once Firestore has rendered it.
+  useEffect(() => {
+    const focusService = (serviceId) => {
+      if (!serviceId) return
+      setActiveTab('services')
+      setFocusedServiceId(serviceId)
+      window.setTimeout(() => {
+        document.querySelector(`[data-service-id="${serviceId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 120)
+    }
+
+    const fromUrl = new URLSearchParams(window.location.search).get('service')
+    if (fromUrl) focusService(fromUrl)
+    const onFocus = event => focusService(event.detail?.serviceId)
+    window.addEventListener('schedule-service-focus', onFocus)
+    return () => window.removeEventListener('schedule-service-focus', onFocus)
+  }, [sLoading])
 
   // ── save handlers ─────────────────────────────────────────────────────────
   const handleSaveR = async (data, rehearsal) => {
@@ -731,7 +753,8 @@ export default function Schedule({ showAdd, onAddClose }) {
             visibleServices.map((s, index) => (
               <ServiceCard key={s.id} service={s} members={members}
                 canManage={canManage} onEdit={setEditingS} currentUserId={user?.uid}
-                setlistLookup={setlistLookup} onViewSetlist={setViewingSetlist} isNext={index === 0} />
+                setlistLookup={setlistLookup} onViewSetlist={setViewingSetlist}
+                isNext={index === 0} focused={focusedServiceId === s.id} />
             ))
           )}
 

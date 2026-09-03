@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  addDoc,
   collection,
   deleteDoc,
   doc,
@@ -147,7 +146,17 @@ export function useSetlistViews(setlistId, enabled = false) {
     setLoading(true)
     const viewsQuery = query(collection(db, 'setlists', setlistId, 'views'))
     const unsub = onSnapshot(viewsQuery, snap => {
-      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      // Legacy builds could create many rows for one viewer. Collapse them to the
+      // viewer's first recorded open so View activity is one person = one row.
+      const firstByViewer = new Map()
+      snap.docs.map(d => ({ id: d.id, ...d.data() })).forEach(row => {
+        const key = row.viewerId || row.id
+        const current = firstByViewer.get(key)
+        const ms = row.viewedAt?.toMillis?.() || 0
+        const currentMs = current?.viewedAt?.toMillis?.() || Number.MAX_SAFE_INTEGER
+        if (!current || ms < currentMs) firstByViewer.set(key, row)
+      })
+      const rows = [...firstByViewer.values()]
       rows.sort((a, b) => (b.viewedAt?.toMillis?.() || 0) - (a.viewedAt?.toMillis?.() || 0))
       setViews(rows)
       setLoading(false)
@@ -162,10 +171,15 @@ export function useSetlistViews(setlistId, enabled = false) {
     if (!user || !setlist?.id || !isPublished(setlist.status)) return
     // Opening your own set list is not useful audience activity, so do not log it.
     if (setlist.createdBy === user.uid) return
-    await addDoc(collection(db, 'setlists', setlist.id, 'views'), {
-      viewerId: user.uid,
-      viewerName: profile?.name || user.displayName || user.email || 'Team member',
-      viewedAt: serverTimestamp(),
+    const viewRef = doc(db, 'setlists', setlist.id, 'views', user.uid)
+    await runTransaction(db, async tx => {
+      const existing = await tx.get(viewRef)
+      if (existing.exists()) return
+      tx.set(viewRef, {
+        viewerId: user.uid,
+        viewerName: profile?.name || user.displayName || user.email || 'Team member',
+        viewedAt: serverTimestamp(),
+      })
     })
   }
 

@@ -644,3 +644,53 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); -web
   .up-next-title { font-size:18px; }
 }
 
+
+/* ── Notification center ─────────────────────────────────────────────────── */
+.notif-bell-wrap { position: relative; width: 32px; height: 32px; flex-shrink: 0; }
+.notif-bell { width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; background: rgba(0,0,0,.055); color: var(--text); display: grid; place-items: center; position: relative; cursor: pointer; }
+.notif-bell svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.notif-badge { position: absolute; top: -4px; right: -5px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: #e53935; color: #fff; border: 2px solid #fff; font-size: 9px; line-height: 13px; font-weight: 800; }
+.notif-scrim { position: fixed; inset: 0; z-index: 1090; border: 0; background: rgba(0,0,0,.12); }
+.notif-panel { position: fixed; z-index: 1100; top: calc(var(--nav-h) + env(safe-area-inset-top, 0px) + 6px); left: 50%; width: min(calc(100vw - 20px), 410px); max-height: min(calc(var(--visual-height, 100dvh) - var(--nav-h) - env(safe-area-inset-top, 0px) - 28px), 620px); transform: translateX(-50%); background: #fff; border: .5px solid rgba(0,0,0,.13); border-radius: 18px; box-shadow: 0 18px 55px rgba(0,0,0,.18); overflow: hidden; display: flex; flex-direction: column; }
+.notif-panel-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 15px 16px 12px; border-bottom: .5px solid var(--border); }
+.notif-panel-head > div { display: flex; flex-direction: column; gap: 2px; }
+.notif-panel-head strong { font-size: 17px; }
+.notif-panel-head span { color: var(--text2); font-size: 12px; }
+.notif-panel-head button { border: 0; background: transparent; color: var(--accent); font-weight: 600; font-size: 12px; }
+.notif-list { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.notif-item { width: 100%; border: 0; border-bottom: .5px solid var(--border); background: #fff; display: grid; grid-template-columns: 38px minmax(0,1fr) 8px; gap: 10px; align-items: start; padding: 13px 15px; text-align: left; cursor: pointer; }
+.notif-item.unread { background: rgba(0,113,227,.055); }
+.notif-item-icon { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; background: var(--bg2); font-size: 18px; }
+.notif-item-copy { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.notif-item-copy strong { font-size: 13px; line-height: 1.25; }
+.notif-item-copy small { color: var(--text2); font-size: 12px; line-height: 1.35; }
+.notif-dot { width: 7px; height: 7px; margin-top: 5px; border-radius: 50%; background: var(--accent); }
+.notif-empty { min-height: 190px; padding: 30px 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 5px; }
+.notif-empty > span { font-size: 28px; }
+.notif-empty strong { font-size: 14px; }
+.notif-empty small { max-width: 260px; color: var(--text2); line-height: 1.4; }
+
+/* Native device share button inside a published set list. */
+.setlist-view-hero-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.setlist-share-btn { min-height: 34px; border: 1px solid rgba(255,255,255,.28); border-radius: 18px; padding: 0 10px; background: rgba(255,255,255,.13); color: #fff; display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 650; cursor: pointer; }
+.setlist-share-btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Notification push opt-in lives inside the bell panel so iOS permission is
+   requested from a real user gesture. */
+.notif-push-card { margin: 10px 12px 0; padding: 11px 12px; border-radius: 12px; background: rgba(0,113,227,.07); display: flex; align-items: center; gap: 10px; border: 1px solid rgba(0,113,227,.12); }
+.notif-push-card > div, .notif-push-card:not(:has(> div)) { min-width: 0; }
+.notif-push-card strong { display: block; font-size: 13px; }
+.notif-push-card span { display: block; color: var(--text2); font-size: 11px; line-height: 1.35; margin-top: 2px; }
+.notif-push-card button { margin-left: auto; flex-shrink: 0; border: 0; border-radius: 999px; min-height: 34px; padding: 0 12px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; }
+.notif-push-card.blocked { background: rgba(255,59,48,.06); border-color: rgba(255,59,48,.13); }
+@media (max-width: 360px) {
+  .notif-panel { width: calc(100vw - 12px); border-radius: 16px; }
+  .notif-panel-head { padding: 13px 13px 11px; }
+  .notif-panel-head strong { font-size: 16px; }
+  .notif-item { grid-template-columns: 34px minmax(0,1fr) 7px; gap: 8px; padding: 12px 12px; }
+  .notif-item-icon { width: 34px; height: 34px; border-radius: 10px; font-size: 17px; }
+  .notif-push-card { margin-left: 10px; margin-right: 10px; }
+}
+
+.schedule-service-card.notification-focus { outline: 3px solid rgba(0,113,227,.28); outline-offset: 2px; animation: service-focus-pulse 1.3s ease-out 1; }
+@keyframes service-focus-pulse { 0% { transform: scale(.985); } 55% { transform: scale(1.008); } 100% { transform: scale(1); } }
