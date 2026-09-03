@@ -8,7 +8,8 @@ import Schedule from './components/Schedule/Schedule'
 import Comms from './components/Comms/Comms'
 import ProfileSheet from './components/Auth/ProfileSheet'
 import NotifBanner from './components/ui/NotifBanner'
-import { requestNotifPermission } from './utils/notifications'
+import NotificationBell from './components/ui/NotificationBell'
+import { syncNotifRegistration } from './utils/notifications'
 
 const TABS = [
   { id: 'songs',    label: 'Library',  icon: <svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg> },
@@ -26,11 +27,22 @@ export default function App() {
   const [showProfile, setShowProfile] = useState(false)
   const [banner, setBanner]         = useState(null)
 
-  // Request push notification permission after login
+  // Refresh an existing push registration after login, but never pop the OS
+  // permission prompt automatically. iPhone requires that prompt to come from
+  // a user gesture, so the notification bell owns the opt-in button.
   useEffect(() => {
-    if (user && profile) {
-      requestNotifPermission(user.uid).catch(() => {})
-    }
+    if (user && profile) syncNotifRegistration(user.uid).catch(() => {})
+  }, [user, profile])
+
+  // Notification taps can launch the installed PWA from a closed state. Honor
+  // the URL route written by the service worker / Cloud Function.
+  useEffect(() => {
+    if (!user || !profile) return
+    const params = new URLSearchParams(window.location.search)
+    const requestedTab = params.get('tab')
+    if (TABS.some(item => item.id === requestedTab)) setTab(requestedTab)
+    else if (params.get('service')) setTab('schedule')
+    else if (params.get('setlist')) setTab('setlist')
   }, [user, profile])
 
   if (loading) return (
@@ -46,6 +58,24 @@ export default function App() {
   const canAddSchedule = isAdmin || profileGroups.includes('admin') || profile?.group === 'admin'
   const noAdd = tab === 'comms' || (tab === 'schedule' && !canAddSchedule)
 
+  const handleNotificationNavigate = (item) => {
+    const url = new URL(window.location.href)
+    if (item?.setlistId) {
+      url.searchParams.set('setlist', item.setlistId)
+      url.searchParams.delete('service')
+    } else if (item?.serviceId) {
+      url.searchParams.set('service', item.serviceId)
+      url.searchParams.delete('setlist')
+    }
+    if (item?.tab) url.searchParams.set('tab', item.tab)
+    window.history.replaceState({}, '', url)
+
+    if (item?.setlistId) window.dispatchEvent(new Event('setlist-link-change'))
+    if (item?.serviceId) window.dispatchEvent(new CustomEvent('schedule-service-focus', { detail: { serviceId: item.serviceId } }))
+    if (item?.tab) setTab(item.tab)
+    setShowAdd(false)
+  }
+
   return (
     <div className="app">
       {/* Banner */}
@@ -53,7 +83,7 @@ export default function App() {
 
       {/* Top Nav */}
       <nav className="top-nav">
-        <span style={{ width: 32 }} />
+        <NotificationBell onNavigate={handleNotificationNavigate} />
         <span className="nav-title">{TAB_TITLES[tab]}</span>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {!noAdd && (

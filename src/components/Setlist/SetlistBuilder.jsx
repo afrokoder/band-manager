@@ -10,8 +10,9 @@ import { extractYouTubeId, youtubeThumbnail } from '../../utils/youtube'
 import { uploadMediaFile } from '../../utils/mediaUpload'
 import BottomSheet from '../ui/BottomSheet'
 import SongMediaFields from '../Songs/SongMediaFields'
+import { createSetlistPdfFile, downloadPdfFile } from '../../utils/pdfExport'
 
-const ELIGIBLE_SECTIONS = ['Praise', 'Worship']
+const ELIGIBLE_SECTIONS = ['Morning Worship', 'Praise', 'Worship', 'Offering']
 const KEYS = ['A', 'Bb', 'B', 'C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab']
 const TAGS = ['slow', 'medium', 'upbeat', 'anthem']
 const COLORS = ['#6366f1','#ec4899','#f59e0b','#10b981','#8b5cf6','#ef4444','#0ea5e9','#f97316','#06b6d4','#84cc16']
@@ -196,9 +197,11 @@ function SongAction({ song }) {
 
 function SetlistViewer({ setlist, onClose, canEdit = false, canDelete = canEdit, onEdit, onDelete }) {
   const { user, isAdmin } = useAuth()
+  const { songs: librarySongs } = useSongs()
   const canSeeViews = !!setlist && (isAdmin || setlist.createdBy === user?.uid)
   const { views, loading: viewsLoading, recordView } = useSetlistViews(setlist?.id, canSeeViews)
   const [showViews, setShowViews] = useState(false)
+  const [sharingPdf, setSharingPdf] = useState(false)
   const recordedRef = useRef(new Set())
 
   useEffect(() => {
@@ -211,6 +214,31 @@ function SetlistViewer({ setlist, onClose, canEdit = false, canDelete = canEdit,
   const submittedTime = formatAuditTime(setlist.submittedAt || setlist.createdAt)
   const editedTime = formatAuditTime(setlist.lastEditedAt || setlist.updatedAt)
 
+  const shareSetlist = async () => {
+    setSharingPdf(true)
+    try {
+      const pdfFile = await createSetlistPdfFile(setlist, librarySongs)
+      const fileShare = { files: [pdfFile] }
+      if (navigator.share && (!navigator.canShare || navigator.canShare(fileShare))) {
+        await navigator.share({
+          title: setlist.title || `${setlist.section} Set List`,
+          text: `${setlist.serviceDateStr || 'Service'} - ${setlist.section || 'Set List'}`,
+          files: [pdfFile],
+        })
+      } else {
+        downloadPdfFile(pdfFile)
+        window.alert('This device does not support sharing PDF files directly, so the set list PDF was downloaded instead.')
+      }
+    } catch (err) {
+      if (err?.name !== 'AbortError') {
+        console.error('Could not create/share set list PDF:', err)
+        window.alert('Could not create the set list PDF. Please try again.')
+      }
+    } finally {
+      setSharingPdf(false)
+    }
+  }
+
   return (
     <BottomSheet
       open
@@ -221,7 +249,7 @@ function SetlistViewer({ setlist, onClose, canEdit = false, canDelete = canEdit,
     >
       <div className="setlist-view-hero">
         <div><div className="label-caps">{setlist.section}</div><div className="setlist-view-title">{setlist.title || `${setlist.section} Set List`}</div></div>
-        <div className="setlist-status published">Published</div>
+        <div className="setlist-view-hero-actions"><button type="button" className="setlist-share-btn" onClick={shareSetlist} disabled={sharingPdf} aria-label="Share set list"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.7l6.8-4.2M8.6 13.3l6.8 4.2"/></svg><span>{sharingPdf ? 'Preparing PDF…' : 'Share PDF'}</span></button><div className="setlist-status published">Published</div></div>
       </div>
       <div className="setlist-meta-row">
         <span>Key <strong>{setlist.setKey || '—'}</strong></span>
@@ -315,10 +343,13 @@ export default function SetlistBuilder({ showAdd, onAddClose }) {
 
     // A combined Praise & Worship assignment represents two independent set-list slots.
     // This lets the same assigned team create one Praise set list and one Worship set list.
+    const sections = ELIGIBLE_SECTIONS.filter(name => (selectedService.sections?.[name] || []).length > 0)
     const hasCombinedAssignment = (selectedService.sections?.['Praise & Worship'] || []).length > 0
-    if (hasCombinedAssignment) return ['Praise', 'Worship']
-
-    return ELIGIBLE_SECTIONS.filter(name => (selectedService.sections?.[name] || []).length > 0)
+    if (hasCombinedAssignment) {
+      if (!sections.includes('Praise')) sections.push('Praise')
+      if (!sections.includes('Worship')) sections.push('Worship')
+    }
+    return sections
   }, [selectedService])
   const publishedForSection = (name) => setlists.find(item =>
     isPublished(item.status) && item.serviceId === serviceId && item.section === name && item.id !== editing?.id
@@ -337,6 +368,17 @@ export default function SetlistBuilder({ showAdd, onAddClose }) {
     setLoopName(item.loopName || ''); setNotes(item.notes || ''); setAttachment(null); setVoiceMemo(null); setSaveError(''); setStep(1); setCreating(true)
   }
   useEffect(() => { if (showAdd && !creating) openCreate() }, [showAdd])
+  useEffect(() => {
+    const openLinkedSet = () => {
+      const id = new URL(window.location.href).searchParams.get('setlist')
+      if (!id) return
+      const item = setlists.find(row => row.id === id && isPublished(row.status))
+      if (item) setViewing(item)
+    }
+    openLinkedSet()
+    window.addEventListener('setlist-link-change', openLinkedSet)
+    return () => window.removeEventListener('setlist-link-change', openLinkedSet)
+  }, [setlists])
   useEffect(() => { if (section && !availableSections.includes(section)) setSection('') }, [serviceId, availableSections, section])
   const closeBuilder = () => { setCreating(false); resetBuilder(); onAddClose?.() }
 
@@ -421,12 +463,12 @@ export default function SetlistBuilder({ showAdd, onAddClose }) {
       <BottomSheet open={creating} onClose={closeBuilder} title={editing ? 'Edit Set List' : 'Create Set List'} subtitle={`Step ${step} of 4 · ${STEPS[step - 1]}`}>
         <Stepper step={step} />
         {step === 1 && <>
-          <div className="setlist-builder-heading">Service & Section</div><p className="setlist-builder-subtext">Only music sections that actually have an assignee on the selected service can receive a set list. A Praise & Worship assignment has two separate set-list slots: Praise and Worship.</p>
+          <div className="setlist-builder-heading">Service & Section</div><p className="setlist-builder-subtext">Choose any assigned music section for this service. Morning Worship and Offering can each have their own set list, and a Praise & Worship assignment has two separate slots: Praise and Worship.</p>
           <div className="form-row"><label className="form-label">Service</label><select className="form-select" value={serviceId} onChange={e => setServiceId(e.target.value)}><option value="">Select a service…</option>{futureServices.map(service => <option key={service.id} value={service.id}>{service.dateStr}</option>)}</select></div>
           {serviceId && <div className="form-row"><label className="form-label">Assigned section</label>{availableSections.length ? <div className="setlist-section-grid">{availableSections.map(item => {
               const occupied = publishedForSection(item)
               return <button key={item} type="button" disabled={!!occupied} className={section === item ? 'active' : ''} onClick={() => setSection(item)}>{item}{occupied ? <small>Set list already published</small> : null}</button>
-            })}</div> : <div className="setlist-info-card">This service has no Praise, Worship, or Praise & Worship assignment yet.</div>}</div>}
+            })}</div> : <div className="setlist-info-card">This service has no Morning Worship, Praise, Worship, Praise & Worship, or Offering assignment yet.</div>}</div>}
           <div className="form-row"><label className="form-label">Set list title <span className="optional">(optional)</span></label><input className="form-input" value={title} onChange={e => setTitle(e.target.value)} placeholder={section ? `${section} Set List` : 'Sunday set list'} /></div>
         </>}
 

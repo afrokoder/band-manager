@@ -59,6 +59,21 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ── Per-user notification read state ───────────────────────────────────────
+    match /users/{userId}/notificationReads/{notificationId} {
+      allow read, create, delete: if authed() && request.auth.uid == userId;
+      allow update: if false;
+    }
+
+    // ── Notification events ───────────────────────────────────────────────────
+    // Admin clients create one deterministic event after the monthly automatic
+    // rehearsal batch is generated. Cloud Functions uses it to send one push.
+    match /notificationEvents/{eventId} {
+      allow read: if authed();
+      allow create: if isAdmin();
+      allow update, delete: if false;
+    }
+
     // ── Songs ─────────────────────────────────────────────────────────────────
     match /songs/{id} {
       allow read: if authed();
@@ -101,21 +116,22 @@ service cloud.firestore {
     // ── Rehearsals ────────────────────────────────────────────────────────────
     match /rehearsals/{id} {
       allow read:           if authed();
-      allow create, delete: if canManage();
+      allow create, delete: if isAdmin();
 
-      // Full update for managers, OR own-RSVP-only update for members
-      allow update: if canManage()
+      // Admins manage rehearsal details. Every member can submit only their own RSVP.
+      allow update: if isAdmin()
                     || (authed()
                         && request.resource.data.diff(resource.data)
                              .affectedKeys().hasOnly(['rsvp'])
                         && request.resource.data.rsvp.diff(resource.data.rsvp)
-                             .affectedKeys().hasOnly([request.auth.uid]));
+                             .affectedKeys().hasOnly([request.auth.uid])
+                        && (!('rsvpLockAt' in resource.data) || request.time < resource.data.rsvpLockAt));
     }
 
     // ── Services ──────────────────────────────────────────────────────────────
     match /services/{id} {
       allow read:  if authed();
-      allow write: if canManage();
+      allow write: if isAdmin();
     }
 
     // ── Setlists ──────────────────────────────────────────────────────────────
@@ -140,10 +156,12 @@ service cloud.firestore {
     // Only the set-list creator or an admin can read the view history.
     match /setlists/{setlistId}/views/{viewId} {
       allow create: if authed()
+                    && viewId == request.auth.uid
                     && request.resource.data.viewerId == request.auth.uid
                     && get(/databases/$(database)/documents/setlists/$(setlistId)).data.status in ['published', 'submitted'];
       allow read: if authed()
-                  && (get(/databases/$(database)/documents/setlists/$(setlistId)).data.createdBy == request.auth.uid
+                  && (viewId == request.auth.uid
+                      || get(/databases/$(database)/documents/setlists/$(setlistId)).data.createdBy == request.auth.uid
                       || isAdmin());
       allow update, delete: if false;
     }
@@ -152,12 +170,12 @@ service cloud.firestore {
     // duplicate prevention atomic even when two managers save at the same time.
     match /serviceDateSlots/{dateKey} {
       allow read: if authed();
-      allow write: if canManage();
+      allow write: if isAdmin();
     }
 
     match /rehearsalDateSlots/{dateKey} {
       allow read: if authed();
-      allow write: if canManage();
+      allow write: if isAdmin();
     }
 
     // Deterministic service/section reservation used to guarantee that only one
