@@ -21,6 +21,7 @@ export default function AddSongSheet({ open, onClose, onSave, song: editSong }) 
   const isEdit = !!editSong
 
   const [title,    setTitle]    = useState('')
+  const [author,   setAuthor]   = useState('')
   const [key,      setKey]      = useState('D')
   const [bpm,      setBpm]      = useState('')
   const [tag,      setTag]      = useState('slow')
@@ -35,6 +36,7 @@ export default function AddSongSheet({ open, onClose, onSave, song: editSong }) 
   useEffect(() => {
     if (editSong) {
       setTitle(editSong.title || '')
+      setAuthor(editSong.author || '')
       setKey(editSong.key || 'D')
       setBpm(editSong.bpm?.toString() || '')
       setTag(editSong.tags?.[0] || 'slow')
@@ -45,7 +47,7 @@ export default function AddSongSheet({ open, onClose, onSave, song: editSong }) 
       setVoiceMemo(null)
     } else {
       // Reset for add mode
-      setTitle(''); setKey('D'); setBpm(''); setTag('slow')
+      setTitle(''); setAuthor(''); setKey('D'); setBpm(''); setTag('slow')
       setNotes(''); setSections([empty()]); setYtUrl('')
       setAttachment(null); setVoiceMemo(null)
     }
@@ -58,7 +60,7 @@ export default function AddSongSheet({ open, onClose, onSave, song: editSong }) 
   const ytVideoId = extractYouTubeId(ytUrl)
   const hasLyrics = sections.some(section => section.lyrics?.trim())
   const hasMedia = !!(ytVideoId || attachment || voiceMemo || editSong?.attachment || editSong?.voiceMemo || editSong?.fileUrl)
-  const canSubmit = !!title.trim() && hasMedia && hasLyrics
+  const canSubmit = !!title.trim() && !!author.trim() && hasMedia && hasLyrics
 
   const submit = async () => {
     if (!canSubmit) return
@@ -71,6 +73,7 @@ export default function AddSongSheet({ open, onClose, onSave, song: editSong }) 
 
       const data = {
         title: title.trim(),
+        author: author.trim(),
         key,
         bpm: parseInt(bpm) || 80,
         tags: [tag],
@@ -98,6 +101,11 @@ export default function AddSongSheet({ open, onClose, onSave, song: editSong }) 
       <div className="form-row">
         <label className="form-label">Title <span style={{ color: 'var(--danger)' }}>*</span></label>
         <input className="form-input" placeholder="Song title" value={title} onChange={e => setTitle(e.target.value)} />
+      </div>
+
+      <div className="form-row">
+        <label className="form-label">Author <span style={{ color: 'var(--danger)' }}>*</span></label>
+        <input className="form-input" placeholder="Songwriter / artist" value={author} onChange={e => setAuthor(e.target.value)} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

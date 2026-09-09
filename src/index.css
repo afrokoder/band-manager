@@ -185,6 +185,8 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); -web
 .song-card:active { transform: scale(0.96); }
 .song-card-bar { position: absolute; left: 0; top: 0; width: 4px; height: 100%; border-radius: var(--r-lg) 0 0 var(--r-lg); }
 .song-card-title { font-family: var(--font-d); font-size: 14px; font-weight: 600; letter-spacing: -0.2px; margin-bottom: 3px; }
+
+.song-card-author { font-size: 12px; color: var(--text2); margin-top: 2px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .song-card-meta  { font-size: 12px; color: var(--text2); }
 .song-card-tags  { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
 .tag { font-size: 10px; font-weight: 500; padding: 2px 7px; border-radius: var(--r-pill); background: rgba(0,113,227,0.1); color: var(--accent-dark); }
@@ -694,3 +696,9 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); -web
 
 .schedule-service-card.notification-focus { outline: 3px solid rgba(0,113,227,.28); outline-offset: 2px; animation: service-focus-pulse 1.3s ease-out 1; }
 @keyframes service-focus-pulse { 0% { transform: scale(.985); } 55% { transform: scale(1.008); } 100% { transform: scale(1); } }
+
+.notif-read-error { margin: 8px 12px 0; padding: 9px 11px; border-radius: 10px; background: rgba(255,59,48,.08); color: #b42318; font-size: 11px; line-height: 1.35; }
+.notif-panel-head button:disabled { opacity: .55; cursor: default; }
+
+.notif-push-card.enabled { background: rgba(52,199,89,.07); border-color: rgba(52,199,89,.16); }
+.notif-push-check { margin-left: auto; width: 26px; height: 26px; border-radius: 50%; display: grid !important; place-items: center; background: #34c759; color: #fff !important; font-size: 14px !important; font-weight: 800; }

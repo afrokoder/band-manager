@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { collection, doc, onSnapshot, query, serverTimestamp, setDoc } from 'firebase/firestore'
+import { collection, doc, onSnapshot, query, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore'
 import { db } from '../firebase'
 import { useAuth } from '../contexts/AuthContext'
 import { useServices } from './useServices'
@@ -8,6 +8,9 @@ import { useSetlists } from './useSetlists'
 import { useMessages } from './useMessages'
 
 const published = status => status === 'published' || status === 'submitted'
+const DAY = 24 * 60 * 60 * 1000
+const UNREAD_RETENTION = 21 * DAY
+const READ_RETENTION = 7 * DAY
 const startOfDay = (value = new Date()) => { const d = new Date(value); d.setHours(0, 0, 0, 0); return d }
 const dayKey = (value = new Date()) => {
   const d = new Date(value)
@@ -37,20 +40,20 @@ export function useNotifications() {
   useEffect(() => {
     if (!user) { setReadIds(new Set()); return undefined }
     const q = query(collection(db, 'users', user.uid, 'notificationReads'))
-    return onSnapshot(q, snap => setReadIds(new Set(snap.docs.map(d => d.id))))
+    return onSnapshot(q, snap => setReadIds(new Set(snap.docs.map(d => d.id))), err => {
+      console.error('Notification read-state subscription failed:', err)
+    })
   }, [user])
 
   const items = useMemo(() => {
     if (!user) return []
     const now = new Date()
+    const nowMs = now.getTime()
     const today = startOfDay(now).getTime()
     const weekday = now.getDay()
     const groups = profile?.groups || (profile?.group ? [profile.group] : [])
     const out = []
 
-    // Automatic Saturday rehearsals are created together, so show one monthly
-    // notification instead of one notification per Saturday. Manual rehearsals
-    // continue to generate their own notification.
     const automaticByMonth = new Map()
     rehearsals.forEach(r => {
       if ((r.dateTs || 0) < today) return
@@ -62,24 +65,28 @@ export function useNotifications() {
         automaticByMonth.set(key, batch)
         return
       }
+      const createdAt = tsMillis(r.createdAt)
+      if (!createdAt) return
       out.push({
         id: `rehearsal-created-${r.id}`,
         type: 'rehearsal',
         title: 'Rehearsal scheduled',
         body: `${r.name || 'Rehearsal'} · ${r.dateStr || ''}${r.time ? ` · ${r.time}` : ''}. Mark your availability.`,
-        createdAt: tsMillis(r.createdAt) || r.dateTs || 0,
+        createdAt,
         tab: 'schedule',
       })
     })
     automaticByMonth.forEach((rows, key) => {
       rows.sort((a, b) => (a.dateTs || 0) - (b.dateTs || 0))
       const monthName = new Date(rows[0].dateTs).toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' })
+      const createdTimes = rows.map(r => tsMillis(r.createdAt)).filter(Boolean)
+      if (!createdTimes.length) return
       out.push({
         id: `rehearsals-created-${key}`,
         type: 'rehearsal',
         title: `${monthName} rehearsals are ready`,
         body: `${rows.length} Saturday rehearsal${rows.length === 1 ? '' : 's'} were created. Mark your availability.`,
-        createdAt: Math.max(...rows.map(r => tsMillis(r.createdAt) || r.dateTs || 0)),
+        createdAt: Math.max(...createdTimes),
         tab: 'schedule',
       })
     })
@@ -87,6 +94,8 @@ export function useNotifications() {
     services.forEach(s => {
       if ((s.dateTs || 0) < today) return
       const assigned = setlistSectionsForService(s, user.uid)
+      const createdAt = tsMillis(s.createdAt)
+      if (!createdAt) return
       out.push({
         id: `service-created-${s.id}`,
         type: 'service',
@@ -94,9 +103,7 @@ export function useNotifications() {
         body: assigned.length
           ? `${s.dateStr || 'Upcoming service'} · ${assigned.join(', ')}. Create the needed set list${assigned.length > 1 ? 's' : ''}.`
           : `${s.dateStr || 'Upcoming service'} has been added to the schedule.`,
-        createdAt: tsMillis(s.createdAt) || s.dateTs || 0,
-        // Assigned-service notifications open the exact service card under
-        // Schedule so the member can immediately see their assignment.
+        createdAt,
         tab: 'schedule',
         serviceId: s.id,
       })
@@ -126,7 +133,6 @@ export function useNotifications() {
       })
     })
 
-    // Wednesday-Friday reminders for the same week's Saturday rehearsal and Sunday service.
     if (weekday >= 3 && weekday <= 5) {
       const saturdayOffset = 6 - weekday
       const sundayOffset = 7 - weekday
@@ -141,7 +147,7 @@ export function useNotifications() {
           type: 'reminder',
           title: 'Rehearsal availability reminder',
           body: `You have not submitted availability for ${r.name || 'Saturday rehearsal'}. Please respond before it closes.`,
-          createdAt: now.getTime(), tab: 'schedule',
+          createdAt: nowMs, tab: 'schedule',
         })
       })
 
@@ -153,25 +159,65 @@ export function useNotifications() {
           type: 'reminder',
           title: 'Set list reminder',
           body: `You are assigned this Sunday and still need to publish: ${missing.join(', ')}.`,
-          createdAt: now.getTime(), tab: 'schedule', serviceId: s.id,
+          createdAt: nowMs, tab: 'schedule', serviceId: s.id,
         })
       })
     }
 
     return out
       .map(item => ({ ...item, read: readIds.has(item.id) }))
+      // Notification center is intentionally short-lived. Read items disappear
+      // after 7 days; unread items expire after 21 days so the bell never becomes
+      // an archive of every event the app has ever generated.
+      .filter(item => {
+        const age = nowMs - Number(item.createdAt || nowMs)
+        return age <= (item.read ? READ_RETENTION : UNREAD_RETENTION)
+      })
       .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))
-      .slice(0, 60)
+      .slice(0, 40)
   }, [messages, profile, readIds, rehearsals, services, setlists, user])
 
   const markRead = async id => {
-    if (!user || !id) return
-    await setDoc(doc(db, 'users', user.uid, 'notificationReads', id), { readAt: serverTimestamp() })
+    if (!user || !id || readIds.has(id)) return
+    setReadIds(current => new Set([...current, id]))
+    try {
+      await setDoc(doc(db, 'users', user.uid, 'notificationReads', id), { readAt: serverTimestamp() }, { merge: true })
+    } catch (error) {
+      console.error('Could not mark notification as read:', error)
+      setReadIds(current => {
+        const next = new Set(current)
+        next.delete(id)
+        return next
+      })
+      throw error
+    }
   }
 
   const markAllRead = async () => {
     if (!user) return
-    await Promise.all(items.filter(item => !item.read).map(item => markRead(item.id)))
+    const unread = items.filter(item => !item.read)
+    if (!unread.length) return
+    const ids = unread.map(item => item.id)
+    setReadIds(current => new Set([...current, ...ids]))
+    try {
+      // Firestore batches are limited to 500 writes; the notification center is
+      // capped at 40, so this remains safely atomic for the visible list.
+      const batch = writeBatch(db)
+      unread.forEach(item => batch.set(
+        doc(db, 'users', user.uid, 'notificationReads', item.id),
+        { readAt: serverTimestamp() },
+        { merge: true },
+      ))
+      await batch.commit()
+    } catch (error) {
+      console.error('Could not mark all notifications as read:', error)
+      setReadIds(current => {
+        const next = new Set(current)
+        ids.forEach(id => next.delete(id))
+        return next
+      })
+      throw error
+    }
   }
 
   return { notifications: items, unreadCount: items.filter(item => !item.read).length, markRead, markAllRead }
