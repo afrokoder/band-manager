@@ -34,19 +34,19 @@ service cloud.firestore {
 
 
     function assignedToSetlistSection(serviceId, section) {
-      let service = get(/databases/$(database)/documents/services/$(serviceId)).data;
+      let svc = get(/databases/$(database)/documents/services/$(serviceId)).data;
       return authed()
              && (
-               (section == 'Morning Worship' && request.auth.uid in service.get('sections', {}).get('Morning Worship', []))
+               (section == 'Morning Worship' && request.auth.uid in svc.get('sections', {}).get('Morning Worship', []))
                || (section == 'Praise' && (
-                    request.auth.uid in service.get('sections', {}).get('Praise', [])
-                    || request.auth.uid in service.get('sections', {}).get('Praise & Worship', [])
+                    request.auth.uid in svc.get('sections', {}).get('Praise', [])
+                    || request.auth.uid in svc.get('sections', {}).get('Praise & Worship', [])
                   ))
                || (section == 'Worship' && (
-                    request.auth.uid in service.get('sections', {}).get('Worship', [])
-                    || request.auth.uid in service.get('sections', {}).get('Praise & Worship', [])
+                    request.auth.uid in svc.get('sections', {}).get('Worship', [])
+                    || request.auth.uid in svc.get('sections', {}).get('Praise & Worship', [])
                   ))
-               || (section == 'Offering' && request.auth.uid in service.get('sections', {}).get('Offering', []))
+               || (section == 'Offering' && request.auth.uid in svc.get('sections', {}).get('Offering', []))
              );
     }
 
