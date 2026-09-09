@@ -10,6 +10,8 @@ import ProfileSheet from './components/Auth/ProfileSheet'
 import NotifBanner from './components/ui/NotifBanner'
 import NotificationBell from './components/ui/NotificationBell'
 import { syncNotifRegistration } from './utils/notifications'
+import { doc, serverTimestamp, setDoc } from 'firebase/firestore'
+import { db } from './firebase'
 
 const TABS = [
   { id: 'songs',    label: 'Library',  icon: <svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg> },
@@ -43,6 +45,20 @@ export default function App() {
     if (TABS.some(item => item.id === requestedTab)) setTab(requestedTab)
     else if (params.get('service')) setTab('schedule')
     else if (params.get('setlist')) setTab('setlist')
+
+    // A lock-screen/system notification carries its deterministic in-app ID in
+    // the URL. Mark it read after authentication so tapping a phone alert also
+    // clears the corresponding bell badge instead of leaving it highlighted.
+    const notificationId = params.get('notification')
+    if (notificationId) {
+      setDoc(doc(db, 'users', user.uid, 'notificationReads', notificationId), { readAt: serverTimestamp() }, { merge: true })
+        .catch(err => console.error('Could not mark push notification as read:', err))
+        .finally(() => {
+          const cleanUrl = new URL(window.location.href)
+          cleanUrl.searchParams.delete('notification')
+          window.history.replaceState({}, '', cleanUrl)
+        })
+    }
   }, [user, profile])
 
   if (loading) return (

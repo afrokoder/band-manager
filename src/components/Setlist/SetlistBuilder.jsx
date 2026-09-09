@@ -61,6 +61,7 @@ function SortableSong({ item, index, onRemove }) {
 function ManualSongForm({ onAdd, userId }) {
   const { addSong } = useSongs()
   const [title, setTitle] = useState('')
+  const [author, setAuthor] = useState('')
   const [key, setKey] = useState('D')
   const [bpm, setBpm] = useState('')
   const [tag, setTag] = useState('slow')
@@ -74,16 +75,16 @@ function ManualSongForm({ onAdd, userId }) {
   const videoId = extractYouTubeId(ytUrl)
   const hasLyrics = sections.some(section => section.lyrics?.trim())
   const hasMedia = !!(videoId || attachment || voiceMemo)
-  const canAdd = !!title.trim() && hasMedia && hasLyrics
+  const canAdd = !!title.trim() && !!author.trim() && hasMedia && hasLyrics
 
   const reset = () => {
-    setTitle(''); setKey('D'); setBpm(''); setTag('slow'); setNotes('')
+    setTitle(''); setAuthor(''); setKey('D'); setBpm(''); setTag('slow'); setNotes('')
     setSections([emptySongSection()]); setYtUrl(''); setAttachment(null); setVoiceMemo(null); setError('')
   }
 
   const submit = async () => {
     if (!canAdd) {
-      setError('Title, lyrics, and either a valid YouTube link, attached file, or voice memo are required.')
+      setError('Title, author, lyrics, and either a valid YouTube link, attached file, or voice memo are required.')
       return
     }
     setBusy(true); setError('')
@@ -93,7 +94,7 @@ function ManualSongForm({ onAdd, userId }) {
         voiceMemo ? uploadMediaFile(voiceMemo, userId, 'songs') : Promise.resolve(null),
       ])
       const data = {
-        title: title.trim(), key, bpm: parseInt(bpm) || 80, tags: [tag], notes,
+        title: title.trim(), author: author.trim(), key, bpm: parseInt(bpm) || 80, tags: [tag], notes,
         sections, youtubeUrl: ytUrl.trim() || null, youtubeVideoId: videoId || null,
         attachment: uploadedAttachment, voiceMemo: uploadedVoiceMemo,
         color: COLORS[Math.floor(Math.random() * COLORS.length)], addedBy: userId,
@@ -101,7 +102,7 @@ function ManualSongForm({ onAdd, userId }) {
       const ref = await addSong(data)
       onAdd({
         uid: `library-${ref.id}-${Date.now()}`, source: 'library', songId: ref.id,
-        title: data.title, link: data.youtubeUrl, attachment: data.attachment, voiceMemo: data.voiceMemo,
+        title: data.title, author: data.author, link: data.youtubeUrl, attachment: data.attachment, voiceMemo: data.voiceMemo,
       })
       reset()
     } catch (e) {
@@ -117,6 +118,7 @@ function ManualSongForm({ onAdd, userId }) {
   return (
     <div className="setlist-manual-card">
       <div className="form-row"><label className="form-label">Title <span style={{ color: 'var(--danger)' }}>*</span></label><input className="form-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="Song title" /></div>
+      <div className="form-row"><label className="form-label">Author <span style={{ color: 'var(--danger)' }}>*</span></label><input className="form-input" value={author} onChange={e => setAuthor(e.target.value)} placeholder="Songwriter / artist" /></div>
       <div className="setlist-two-col">
         <div className="form-row"><label className="form-label">Key</label><select className="form-select" value={key} onChange={e => setKey(e.target.value)}>{KEYS.map(item => <option key={item}>{item}</option>)}</select></div>
         <div className="form-row"><label className="form-label">BPM</label><input className="form-input" type="number" value={bpm} onChange={e => setBpm(e.target.value)} placeholder="72" /></div>
@@ -337,24 +339,26 @@ export default function SetlistBuilder({ showAdd, onAddClose }) {
   const past = setlists.filter(s => isPublished(s.status) && (s.serviceDateTs || 0) < today.getTime()).sort(byServiceDate)
   const visibleRows = tab === 'drafts' ? drafts : tab === 'past' ? past : futurePublished
   const selectedService = services.find(s => s.id === serviceId)
-  const futureServices = useMemo(() => services.filter(s => (s.dateTs || 0) >= today.getTime()), [services])
-  const availableSections = useMemo(() => {
-    if (!selectedService) return []
-
-    // A combined Praise & Worship assignment represents two independent set-list slots.
-    // This lets the same assigned team create one Praise set list and one Worship set list.
-    const sections = ELIGIBLE_SECTIONS.filter(name => (selectedService.sections?.[name] || []).length > 0)
-    const hasCombinedAssignment = (selectedService.sections?.['Praise & Worship'] || []).length > 0
-    if (hasCombinedAssignment) {
+  const assignedSectionsForUser = service => {
+    if (!service || !myId) return []
+    const sections = []
+    ELIGIBLE_SECTIONS.forEach(name => {
+      if ((service.sections?.[name] || []).includes(myId)) sections.push(name)
+    })
+    if ((service.sections?.['Praise & Worship'] || []).includes(myId)) {
       if (!sections.includes('Praise')) sections.push('Praise')
       if (!sections.includes('Worship')) sections.push('Worship')
     }
     return sections
-  }, [selectedService])
+  }
+  const futureServices = useMemo(() => services.filter(service =>
+    (service.dateTs || 0) >= today.getTime() && assignedSectionsForUser(service).length > 0
+  ), [services, myId])
+  const availableSections = useMemo(() => assignedSectionsForUser(selectedService), [selectedService, myId])
   const publishedForSection = (name) => setlists.find(item =>
     isPublished(item.status) && item.serviceId === serviceId && item.section === name && item.id !== editing?.id
   )
-  const filteredLibrary = librarySongs.filter(song => !songQuery.trim() || song.title?.toLowerCase().includes(songQuery.toLowerCase()))
+  const filteredLibrary = librarySongs.filter(song => !songQuery.trim() || song.title?.toLowerCase().includes(songQuery.toLowerCase()) || song.author?.toLowerCase().includes(songQuery.toLowerCase()))
 
   const resetBuilder = () => {
     setEditing(null); setStep(1); setServiceId(''); setSection(''); setTitle(''); setSelectedSongs([])
@@ -463,19 +467,19 @@ export default function SetlistBuilder({ showAdd, onAddClose }) {
       <BottomSheet open={creating} onClose={closeBuilder} title={editing ? 'Edit Set List' : 'Create Set List'} subtitle={`Step ${step} of 4 · ${STEPS[step - 1]}`}>
         <Stepper step={step} />
         {step === 1 && <>
-          <div className="setlist-builder-heading">Service & Section</div><p className="setlist-builder-subtext">Choose any assigned music section for this service. Morning Worship and Offering can each have their own set list, and a Praise & Worship assignment has two separate slots: Praise and Worship.</p>
+          <div className="setlist-builder-heading">Service & Section</div><p className="setlist-builder-subtext">Only services and sections assigned to you are available here. Morning Worship and Offering can each have their own set list, and a Praise & Worship assignment has two separate slots: Praise and Worship.</p>
           <div className="form-row"><label className="form-label">Service</label><select className="form-select" value={serviceId} onChange={e => setServiceId(e.target.value)}><option value="">Select a service…</option>{futureServices.map(service => <option key={service.id} value={service.id}>{service.dateStr}</option>)}</select></div>
           {serviceId && <div className="form-row"><label className="form-label">Assigned section</label>{availableSections.length ? <div className="setlist-section-grid">{availableSections.map(item => {
               const occupied = publishedForSection(item)
               return <button key={item} type="button" disabled={!!occupied} className={section === item ? 'active' : ''} onClick={() => setSection(item)}>{item}{occupied ? <small>Set list already published</small> : null}</button>
-            })}</div> : <div className="setlist-info-card">This service has no Morning Worship, Praise, Worship, Praise & Worship, or Offering assignment yet.</div>}</div>}
+            })}</div> : <div className="setlist-info-card">You are not assigned to a set-list section for this service.</div>}</div>}
           <div className="form-row"><label className="form-label">Set list title <span className="optional">(optional)</span></label><input className="form-input" value={title} onChange={e => setTitle(e.target.value)} placeholder={section ? `${section} Set List` : 'Sunday set list'} /></div>
         </>}
 
         {step === 2 && <>
           <div className="setlist-builder-heading">Add Songs</div><p className="setlist-builder-subtext">Choose a Library song or add a complete new song. Manually added songs are automatically saved to the Library.</p>
           <div className="setlist-mode-tabs"><button type="button" className={songMode === 'library' ? 'active' : ''} onClick={() => setSongMode('library')}>Library</button><button type="button" className={songMode === 'manual' ? 'active' : ''} onClick={() => setSongMode('manual')}>Add Manually</button></div>
-          {songMode === 'library' ? <><div className="search-wrap" style={{ marginBottom: 12 }}><svg className="search-ico" viewBox="0 0 24 24"><path d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/></svg><input className="search-input" value={songQuery} onChange={e => setSongQuery(e.target.value)} placeholder="Search your library…" /></div><div className="setlist-library-list">{filteredLibrary.map(song => { const added = selectedSongs.some(item => item.songId === song.id); return <button type="button" key={song.id} className="setlist-library-row" onClick={() => addLibrarySong(song)} disabled={added}><div className="setlist-library-art" style={{ background: song.color || 'var(--accent)' }}>♫</div><div><strong>{song.title}</strong><span>{song.youtubeUrl ? 'Library song · Link available' : 'Library song'}</span></div><span>{added ? '✓' : '+'}</span></button> })}</div></> : <ManualSongForm onAdd={song => setSelectedSongs(current => [...current, song])} userId={user?.uid} />}
+          {songMode === 'library' ? <><div className="search-wrap" style={{ marginBottom: 12 }}><svg className="search-ico" viewBox="0 0 24 24"><path d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/></svg><input className="search-input" value={songQuery} onChange={e => setSongQuery(e.target.value)} placeholder="Search your library…" /></div><div className="setlist-library-list">{filteredLibrary.map(song => { const added = selectedSongs.some(item => item.songId === song.id); return <button type="button" key={song.id} className="setlist-library-row" onClick={() => addLibrarySong(song)} disabled={added}><div className="setlist-library-art" style={{ background: song.color || 'var(--accent)' }}>♫</div><div><strong>{song.title}</strong><span>{[song.author, song.youtubeUrl ? 'Link available' : 'Library song'].filter(Boolean).join(' · ')}</span></div><span>{added ? '✓' : '+'}</span></button> })}</div></> : <ManualSongForm onAdd={song => setSelectedSongs(current => [...current, song])} userId={user?.uid} />}
           {selectedSongs.length > 0 && <div className="setlist-selected-wrap"><div className="between"><span className="form-label">Current set ({selectedSongs.length})</span><small>Drag to reorder</small></div><DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}><SortableContext items={selectedSongs.map(item => item.uid)} strategy={verticalListSortingStrategy}>{selectedSongs.map((item, index) => <SortableSong key={item.uid} item={item} index={index} onRemove={removeSong} />)}</SortableContext></DndContext></div>}
         </>}
 

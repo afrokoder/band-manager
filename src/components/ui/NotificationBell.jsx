@@ -12,6 +12,8 @@ export default function NotificationBell({ onNavigate }) {
   const [open, setOpen] = useState(false)
   const [pushState, setPushState] = useState(() => notificationCapability())
   const [enabling, setEnabling] = useState(false)
+  const [markingAll, setMarkingAll] = useState(false)
+  const [readError, setReadError] = useState('')
   const panelRef = useRef(null)
   const bellRef = useRef(null)
 
@@ -31,9 +33,27 @@ export default function NotificationBell({ onNavigate }) {
   }, [open])
 
   const openItem = async item => {
-    await markRead(item.id).catch(() => {})
+    setReadError('')
+    try {
+      await markRead(item.id)
+    } catch {
+      setReadError('Could not save read status. Check your connection and try again.')
+      return
+    }
     setOpen(false)
     onNavigate?.(item)
+  }
+
+  const handleMarkAll = async () => {
+    setMarkingAll(true)
+    setReadError('')
+    try {
+      await markAllRead()
+    } catch {
+      setReadError('Could not mark all notifications as read. Please try again.')
+    } finally {
+      setMarkingAll(false)
+    }
   }
 
   const enablePush = async () => {
@@ -53,7 +73,7 @@ export default function NotificationBell({ onNavigate }) {
       <section ref={panelRef} className="notif-panel" aria-label="Notifications">
         <div className="notif-panel-head">
           <div><strong>Notifications</strong><span>{unreadCount ? `${unreadCount} unread` : 'You’re all caught up'}</span></div>
-          {unreadCount > 0 && <button type="button" onClick={() => markAllRead().catch(() => {})}>Mark all read</button>}
+          {unreadCount > 0 && <button type="button" disabled={markingAll} onClick={handleMarkAll}>{markingAll ? 'Marking…' : 'Mark all read'}</button>}
         </div>
 
         {pushState.needsHomeScreen && (
@@ -74,6 +94,14 @@ export default function NotificationBell({ onNavigate }) {
             <span>Enable notifications for Band Manager in your phone/browser notification settings to receive lock-screen alerts.</span>
           </div>
         )}
+        {!pushState.needsHomeScreen && pushState.supported && pushState.permission === 'granted' && (
+          <div className="notif-push-card enabled">
+            <div><strong>Phone notifications are on</strong><span>This device is registered for schedule, set list, rehearsal and Comms alerts.</span></div>
+            <span className="notif-push-check">✓</span>
+          </div>
+        )}
+
+        {readError && <div className="notif-read-error">{readError}</div>}
 
         <div className="notif-list">
           {notifications.length === 0 ? <div className="notif-empty"><span>🔔</span><strong>No notifications yet</strong><small>Schedule, set list and group updates will appear here.</small></div> : notifications.map(item => (

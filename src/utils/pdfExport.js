@@ -1,27 +1,25 @@
 import config from '../config'
 
 function safeFileName(value) {
-  return String(value || 'set-list')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'set-list'
+  return String(value || 'set-list').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'set-list'
 }
 
-function displayTimestamp(value) {
-  const date = value?.toDate?.() || (value instanceof Date ? value : null)
-  if (!date) return ''
-  return date.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+function displayDate(value) {
+  if (!value) return ''
+  const parsed = new Date(`${value}T12:00:00`)
+  if (Number.isNaN(parsed.getTime())) return String(value)
+  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function cleanUrl(value) {
   if (!value) return ''
-  try {
-    const parsed = new URL(value)
-    return parsed.toString()
-  } catch {
-    return String(value)
-  }
+  try { return new URL(value).toString() } catch { return String(value) }
+}
+
+function titleCase(value) {
+  return String(value || '')
+    .replace(/[-_]+/g, ' ')
+    .replace(/\b\w/g, char => char.toUpperCase())
 }
 
 export async function createSetlistPdfFile(setlist, librarySongs = []) {
@@ -31,247 +29,285 @@ export async function createSetlistPdfFile(setlist, librarySongs = []) {
 
   const pageW = doc.internal.pageSize.getWidth()
   const pageH = doc.internal.pageSize.getHeight()
-  const margin = 44
+  const margin = 38
   const contentW = pageW - margin * 2
-  const accent = [0, 113, 227]
-  const ink = [29, 29, 31]
-  const muted = [103, 103, 108]
-  const soft = [245, 247, 250]
-  const rule = [222, 224, 228]
+  const pageBottom = pageH - 44
+
+  const navy = [4, 49, 91]
+  const navy2 = [3, 67, 120]
+  const blue = [0, 113, 227]
+  const ink = [20, 42, 66]
+  const muted = [84, 105, 127]
+  const soft = [244, 248, 252]
+  const softBlue = [235, 244, 253]
+  const border = [222, 231, 240]
+  const white = [255, 255, 255]
+
+  const libraryById = new Map(librarySongs.map(song => [song.id, song]))
+  const songs = (setlist.songs || []).map(setSong => ({ ...libraryById.get(setSong.songId), ...setSong }))
+
   let y = 0
+  let pageNumber = 1
 
-  const footerH = 30
-  const pageBottom = pageH - footerH - 18
-
-  const addPage = () => {
-    doc.addPage()
-    y = 48
+  const setFont = (family = 'helvetica', style = 'normal', size = 11, color = ink) => {
+    doc.setFont(family, style)
+    doc.setFontSize(size)
+    doc.setTextColor(...color)
   }
 
-  const ensureSpace = needed => {
-    if (y + needed <= pageBottom) return
-    addPage()
-  }
-
-  const textLines = (text, width, size = 11) => {
+  const split = (text, width, size = 11, family = 'helvetica', style = 'normal') => {
+    doc.setFont(family, style)
     doc.setFontSize(size)
     return doc.splitTextToSize(String(text || ''), width)
   }
 
-  const sectionLabel = label => {
-    ensureSpace(36)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(10)
-    doc.setTextColor(...accent)
-    doc.text(String(label).toUpperCase(), margin, y)
-    y += 10
-    doc.setDrawColor(...rule)
-    doc.setLineWidth(0.7)
-    doc.line(margin, y, pageW - margin, y)
+  const footer = () => {
+    doc.setDrawColor(...border)
+    doc.setLineWidth(0.6)
+    doc.line(margin, pageH - 28, pageW - margin, pageH - 28)
+    setFont('helvetica', 'normal', 8.5, muted)
+    doc.text(`${config.orgName || 'Band Manager'} · Set List`, margin, pageH - 14)
+    doc.text(String(pageNumber), pageW - margin, pageH - 14, { align: 'right' })
+  }
+
+  const addContinuationPage = () => {
+    footer()
+    doc.addPage()
+    pageNumber += 1
+    doc.setFillColor(...navy)
+    doc.rect(0, 0, pageW, 54, 'F')
+    setFont('helvetica', 'bold', 10, white)
+    doc.text((config.orgFullName || config.orgName || 'Band Manager').toUpperCase(), margin, 22)
+    setFont('helvetica', 'normal', 9.5, white)
+    doc.text(`${setlist.serviceDateStr || ''}${setlist.section ? `  ·  ${setlist.section}` : ''}`, margin, 39)
+    y = 78
+  }
+
+  const ensure = needed => {
+    if (y + needed > pageBottom) addContinuationPage()
+  }
+
+  const drawFirstPageHeader = () => {
+    const headerH = 205
+    doc.setFillColor(...navy)
+    doc.rect(0, 0, pageW, headerH, 'F')
+    doc.setFillColor(...navy2)
+    doc.rect(0, 0, pageW, 8, 'F')
+
+    doc.setFillColor(5, 59, 107)
+    doc.triangle(0, 126, pageW * 0.58, 72, pageW * 0.48, headerH, 'F')
+    doc.setFillColor(4, 72, 128)
+    doc.triangle(pageW * 0.40, headerH, pageW, 106, pageW, headerH, 'F')
+
+    setFont('times', 'italic', 24, white)
+    doc.text('AGM', margin, 48)
+    setFont('helvetica', 'bold', 8.5, [220, 236, 250])
+    doc.text('BAND MANAGER', margin + 2, 65)
+
+    setFont('helvetica', 'bold', 13, white)
+    doc.text('SUNDAY SET LIST', pageW - margin, 42, { align: 'right' })
+    setFont('helvetica', 'normal', 10.5, [229, 240, 251])
+    const serviceInfo = [displayDate(setlist.serviceDateStr), setlist.section].filter(Boolean)
+    serviceInfo.forEach((line, index) => doc.text(String(line).toUpperCase(), pageW - margin, 61 + index * 16, { align: 'right' }))
+
+    const setTitle = setlist.title || `${setlist.section || 'Sunday'} Set List`
+    const titleLines = split(setTitle, contentW - 70, 27, 'times', 'italic').slice(0, 2)
+    setFont('times', 'italic', 27, white)
+    doc.text(titleLines, pageW / 2, 127, { align: 'center' })
+
+    setFont('helvetica', 'bold', 9.5, [227, 239, 250])
+    const details = [
+      setlist.setKey ? `SET KEY: ${setlist.setKey}` : '',
+      `${songs.length} SONG${songs.length === 1 ? '' : 'S'}`,
+    ].filter(Boolean).join('   ·   ')
+    doc.text(details, pageW / 2, 174, { align: 'center' })
+
+    y = headerH + 25
+  }
+
+  const drawNotes = () => {
+    if (!setlist.notes) return
+    const lines = split(setlist.notes, contentW - 34, 10.5)
+    const h = 36 + lines.length * 14
+    ensure(h + 16)
+    doc.setFillColor(...softBlue)
+    doc.roundedRect(margin, y, contentW, h, 12, 12, 'F')
+    setFont('helvetica', 'bold', 9, navy2)
+    doc.text('TEAM NOTES', margin + 17, y + 19)
+    setFont('helvetica', 'normal', 10.5, ink)
+    doc.text(lines, margin + 17, y + 39)
+    y += h + 18
+  }
+
+  const drawSongList = () => {
+    ensure(54)
+    setFont('helvetica', 'bold', 12, navy)
+    doc.text('SONGS', margin, y + 2)
     y += 18
+
+    songs.forEach((song, index) => {
+      const title = song.title || 'Untitled Song'
+      const titleLines = split(title, contentW - 82, 13.5, 'helvetica', 'bold').slice(0, 2)
+      const rowH = Math.max(54, 26 + titleLines.length * 14)
+      ensure(rowH + 8)
+
+      doc.setFillColor(...soft)
+      doc.roundedRect(margin, y, contentW, rowH, 10, 10, 'F')
+      doc.setFillColor(...navy2)
+      doc.roundedRect(margin + 10, y + 9, 38, 38, 7, 7, 'F')
+      setFont('helvetica', 'bold', 15, white)
+      doc.text(String(index + 1), margin + 29, y + 34, { align: 'center' })
+
+      setFont('helvetica', 'bold', 13.5, ink)
+      doc.text(titleLines, margin + 60, y + 22)
+      if (song.author) {
+        setFont('helvetica', 'normal', 10, muted)
+        doc.text(song.author, margin + 60, y + 22 + titleLines.length * 14)
+      }
+      y += rowH + 8
+    })
+    y += 10
   }
 
-  const drawPill = (label, value, x, top, width) => {
-    if (!value) return
-    doc.setFillColor(...soft)
-    doc.roundedRect(x, top, width, 47, 7, 7, 'F')
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(8.5)
-    doc.setTextColor(...muted)
-    doc.text(String(label).toUpperCase(), x + 10, top + 16)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(12)
-    doc.setTextColor(...ink)
-    const lines = doc.splitTextToSize(String(value), width - 20).slice(0, 2)
-    doc.text(lines, x + 10, top + 33)
-  }
-
-  const drawMetaRow = (label, value) => {
-    if (!value) return
-    const labelW = 112
-    const lines = textLines(value, contentW - labelW, 11)
-    const h = Math.max(20, lines.length * 14)
-    ensureSpace(h + 4)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(10)
-    doc.setTextColor(...muted)
-    doc.text(label, margin, y)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(11)
-    doc.setTextColor(...ink)
-    doc.text(lines, margin + labelW, y)
-    y += h
-  }
-
-  const drawParagraphCard = (title, text) => {
-    if (!text) return
-    const lines = textLines(text, contentW - 28, 11.5)
-    const h = 36 + lines.length * 15
-    ensureSpace(h + 12)
-    doc.setFillColor(...soft)
-    doc.roundedRect(margin, y, contentW, h, 9, 9, 'F')
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(10)
-    doc.setTextColor(...muted)
-    doc.text(title.toUpperCase(), margin + 14, y + 20)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(11.5)
-    doc.setTextColor(...ink)
-    doc.text(lines, margin + 14, y + 39)
-    y += h + 12
-  }
-
-  const drawLink = (label, url, x, top) => {
-    if (!url) return 0
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(10)
-    doc.setTextColor(...accent)
-    const display = `${label}  ›`
-    doc.textWithLink(display, x, top, { url: cleanUrl(url) })
-    return doc.getTextWidth(display) + 18
-  }
-
-  const drawHeader = () => {
-    doc.setFillColor(...accent)
-    doc.rect(0, 0, pageW, 112, 'F')
-
-    doc.setTextColor(255, 255, 255)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(11)
-    doc.text((config.orgName || 'Amazing Grace Church').toUpperCase(), margin, 28)
-
-    const title = setlist.title || `${setlist.section || ''} Set List`
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(23)
-    const titleLines = doc.splitTextToSize(title, contentW).slice(0, 2)
-    doc.text(titleLines, margin, 58)
-
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(12)
-    const serviceLine = [setlist.serviceDateStr || 'Service', setlist.section].filter(Boolean).join('  •  ')
-    doc.text(serviceLine, margin, 96)
-    y = 138
-  }
-
-  drawHeader()
-
-  // At-a-glance set information. Larger type and compact cards make this
-  // readable on a phone when the PDF is opened from the share sheet.
-  const pillGap = 8
-  const pillW = (contentW - pillGap * 2) / 3
-  const pills = [
-    ['Set key', setlist.setKey || '—'],
-    ['Tempo', setlist.tempo ? `${setlist.tempo} BPM` : '—'],
-    ['Songs', String((setlist.songs || []).length)],
-  ]
-  pills.forEach((item, index) => drawPill(item[0], item[1], margin + index * (pillW + pillGap), y, pillW))
-  y += 67
-
-  sectionLabel('Set details')
-  drawMetaRow('Service date', setlist.serviceDateStr)
-  drawMetaRow('Section', setlist.section)
-  drawMetaRow('Loop track', setlist.loopName)
-  drawMetaRow('Submitted by', setlist.submittedByName || setlist.createdByName)
-  drawMetaRow('Submitted', displayTimestamp(setlist.submittedAt || setlist.createdAt))
-  drawMetaRow('Last edited by', setlist.lastEditedByName)
-  drawMetaRow('Last edited', displayTimestamp(setlist.lastEditedAt || setlist.updatedAt))
-
-  if (setlist.attachment?.url || setlist.voiceMemo?.url) {
-    ensureSpace(40)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(10)
-    doc.setTextColor(...muted)
-    doc.text('SET MEDIA', margin, y)
-    let linkX = margin + 112
-    linkX += drawLink(setlist.attachment?.name || 'Attachment', setlist.attachment?.url, linkX, y)
-    drawLink('Voice memo', setlist.voiceMemo?.url, linkX, y)
-    y += 24
-  }
-
-  drawParagraphCard('Team notes', setlist.notes)
-
-  sectionLabel(`Songs · ${(setlist.songs || []).length}`)
-
-  const libraryById = new Map(librarySongs.map(song => [song.id, song]))
-  ;(setlist.songs || []).forEach((setSong, index) => {
-    const librarySong = libraryById.get(setSong.songId) || {}
-    const song = { ...librarySong, ...setSong }
-
-    const chips = [
-      song.key && `Key ${song.key}`,
-      song.bpm && `${song.bpm} BPM`,
-      ...(Array.isArray(song.tags) ? song.tags.slice(0, 3) : []),
-    ].filter(Boolean)
-    const noteLines = song.notes ? textLines(song.notes, contentW - 38, 10.5) : []
-    const cardH = 66 + (chips.length ? 22 : 0) + (noteLines.length ? 21 + noteLines.length * 13 : 0) + ((song.youtubeUrl || song.link || song.attachment?.url || song.voiceMemo?.url) ? 27 : 0)
-    ensureSpace(cardH + 12)
-
+  const drawLyricsSongHeader = (song, index) => {
+    const numberW = 50
+    ensure(64)
     const cardTop = y
-    doc.setFillColor(255, 255, 255)
-    doc.setDrawColor(...rule)
-    doc.setLineWidth(0.8)
-    doc.roundedRect(margin, cardTop, contentW, cardH, 10, 10, 'FD')
 
-    doc.setFillColor(...accent)
-    doc.circle(margin + 24, cardTop + 28, 15, 'F')
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(11)
-    doc.setTextColor(255, 255, 255)
-    doc.text(String(index + 1), margin + 24, cardTop + 32, { align: 'center' })
+    doc.setFillColor(...navy2)
+    doc.roundedRect(margin, cardTop, numberW, 46, 8, 8, 'F')
+    setFont('helvetica', 'bold', 18, white)
+    doc.text(String(index + 1), margin + numberW / 2, cardTop + 30, { align: 'center' })
 
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(15)
-    doc.setTextColor(...ink)
-    const titleLines = doc.splitTextToSize(song.title || 'Untitled song', contentW - 75).slice(0, 2)
-    doc.text(titleLines, margin + 50, cardTop + 24)
+    const titleX = margin + numberW + 14
+    const titleWidth = contentW - numberW - 26
+    const titleLines = split(song.title || 'Untitled Song', titleWidth, 14.5, 'helvetica', 'bold').slice(0, 2)
+    setFont('helvetica', 'bold', 14.5, ink)
+    doc.text(titleLines, titleX, cardTop + 17)
 
-    let cursorY = cardTop + 54
-    if (chips.length) {
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(9.5)
-      doc.setTextColor(...muted)
-      doc.text(chips.join('   •   '), margin + 18, cursorY)
-      cursorY += 22
+    if (song.author) {
+      setFont('helvetica', 'normal', 10, muted)
+      doc.text(song.author, titleX, cardTop + 21 + titleLines.length * 14)
     }
 
-    if (noteLines.length) {
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(9)
-      doc.setTextColor(...muted)
-      doc.text('NOTES', margin + 18, cursorY)
-      cursorY += 14
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(10.5)
-      doc.setTextColor(...ink)
-      doc.text(noteLines, margin + 18, cursorY)
-      cursorY += noteLines.length * 13 + 7
+    y = cardTop + 58
+  }
+
+  const drawMediaLinks = song => {
+    const links = [
+      ['YouTube', song.youtubeUrl || song.link],
+      [song.attachment?.name || 'Song File', song.attachment?.url],
+      ['Voice Memo', song.voiceMemo?.url],
+    ].filter(([, url]) => Boolean(url))
+    if (!links.length) return
+
+    ensure(24)
+    let x = margin + 64
+    setFont('helvetica', 'bold', 8.8, blue)
+    links.forEach(([label, url], idx) => {
+      const text = idx === 0 ? label : `  ·  ${label}`
+      doc.textWithLink(text, x, y, { url: cleanUrl(url) })
+      x += doc.getTextWidth(text)
+    })
+    y += 16
+  }
+
+  const drawLyrics = song => {
+    const sections = Array.isArray(song.sections) ? song.sections : []
+    const lyricSections = sections.filter(section => String(section.lyrics || '').trim())
+
+    if (!lyricSections.length) {
+      ensure(54)
+      doc.setFillColor(...soft)
+      doc.roundedRect(margin + 64, y, contentW - 64, 42, 8, 8, 'F')
+      setFont('helvetica', 'italic', 10.5, muted)
+      doc.text('No lyrics saved for this song.', margin + 78, y + 25)
+      y += 58
+      return
     }
 
-    // Lyrics are intentionally omitted from the shared PDF. The PDF is a
-    // concise service/set reference, while full lyrics remain in Band Manager.
-    if (song.youtubeUrl || song.link || song.attachment?.url || song.voiceMemo?.url) {
-      let linkX = margin + 18
-      const linkY = cardTop + cardH - 16
-      linkX += drawLink('YouTube', song.youtubeUrl || song.link, linkX, linkY)
-      linkX += drawLink(song.attachment?.name || 'Song file', song.attachment?.url, linkX, linkY)
-      drawLink('Voice memo', song.voiceMemo?.url, linkX, linkY)
-    }
+    lyricSections.forEach(section => {
+      const lyricText = String(section.lyrics || '').trim()
+      const heading = titleCase(section.label || '')
+      const lyricWidth = contentW - 96
+      const lyricLines = split(lyricText, lyricWidth, 11.5, 'helvetica', 'normal')
+      let cursor = 0
+      let isFirstChunk = true
 
-    y += cardH + 12
+      while (cursor < lyricLines.length) {
+        const headingH = isFirstChunk && heading ? 18 : 0
+        if (pageBottom - y < 72) addContinuationPage()
+
+        const roomLines = Math.max(3, Math.floor((pageBottom - y - headingH - 30) / 15))
+        const take = Math.min(roomLines, lyricLines.length - cursor)
+        const chunk = lyricLines.slice(cursor, cursor + take)
+        const blockH = 25 + headingH + chunk.length * 15
+
+        doc.setFillColor(...soft)
+        doc.roundedRect(margin + 64, y, contentW - 64, blockH, 9, 9, 'F')
+        let textY = y + 20
+        if (isFirstChunk && heading) {
+          setFont('helvetica', 'bold', 8.5, navy2)
+          doc.text(heading.toUpperCase(), margin + 78, textY)
+          textY += 18
+        }
+        setFont('helvetica', 'normal', 11.5, ink)
+        doc.text(chunk, margin + 78, textY)
+        y += blockH + 8
+        cursor += take
+        isFirstChunk = false
+
+        if (cursor < lyricLines.length && pageBottom - y < 54) addContinuationPage()
+      }
+    })
+
+    if (song.notes) {
+      const noteLines = split(song.notes, contentW - 96, 9.5)
+      const h = 24 + noteLines.length * 13
+      ensure(h + 8)
+      doc.setFillColor(...softBlue)
+      doc.roundedRect(margin + 64, y, contentW - 64, h, 8, 8, 'F')
+      setFont('helvetica', 'bold', 8, navy2)
+      doc.text('SONG NOTES', margin + 78, y + 16)
+      setFont('helvetica', 'normal', 9.5, ink)
+      doc.text(noteLines, margin + 78, y + 32)
+      y += h + 8
+    }
+  }
+
+  drawFirstPageHeader()
+  drawNotes()
+  drawSongList()
+
+  // Lyrics start after the complete song list. Each song gets one header only;
+  // continuation pages simply continue the lyrics without repeating the title.
+  if (songs.length) {
+    addContinuationPage()
+    setFont('helvetica', 'bold', 12, navy)
+    doc.text('LYRICS', margin, y)
+    y += 20
+  }
+
+  songs.forEach((song, index) => {
+    ensure(86)
+    drawLyricsSongHeader(song, index)
+    drawMediaLinks(song)
+    drawLyrics(song)
+    y += 14
   })
 
-  const totalPages = doc.getNumberOfPages()
-  for (let page = 1; page <= totalPages; page += 1) {
-    doc.setPage(page)
-    doc.setDrawColor(...rule)
-    doc.setLineWidth(0.6)
-    doc.line(margin, pageH - footerH - 2, pageW - margin, pageH - footerH - 2)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
-    doc.setTextColor(...muted)
-    doc.text(`${config.orgName || 'Band Manager'} · Set List`, margin, pageH - 16)
-    doc.text(`Page ${page} of ${totalPages}`, pageW - margin, pageH - 16, { align: 'right' })
-  }
+  const scripture = '"Let everything that has breath praise the Lord."'
+  const scriptureRef = 'PSALM 150:6'
+  ensure(92)
+  doc.setFillColor(...softBlue)
+  doc.roundedRect(margin + 32, y, contentW - 64, 72, 12, 12, 'F')
+  setFont('times', 'italic', 12.5, navy2)
+  doc.text(scripture, pageW / 2, y + 30, { align: 'center' })
+  setFont('helvetica', 'bold', 8.5, muted)
+  doc.text(scriptureRef, pageW / 2, y + 51, { align: 'center' })
+  y += 84
+
+  footer()
 
   const blob = doc.output('blob')
   const name = `${safeFileName(setlist.serviceDateStr)}-${safeFileName(setlist.section)}-set-list.pdf`

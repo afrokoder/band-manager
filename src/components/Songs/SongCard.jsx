@@ -21,6 +21,7 @@ export default function SongCard({ song, onClick }) {
         <div className="song-card-bar" style={{ background: color }} />
       )}
       <div className="song-card-title">{song.title}</div>
+      {song.author && <div className="song-card-author">{song.author}</div>}
       <div className="song-card-meta">{song.key} · {song.bpm} BPM</div>
       <div className="song-card-tags">
         {song.tags?.map(t => <span key={t} className="tag">{t}</span>)}
