@@ -1,4 +1,5 @@
 import { initializeApp } from 'firebase/app'
+import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check'
 import { getAuth, GoogleAuthProvider } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
@@ -14,6 +15,25 @@ const firebaseConfig = {
 }
 
 const app = initializeApp(firebaseConfig)
+
+// App Check attaches an attestation token to Storage/Firestore requests so the
+// backend can reject calls that don't originate from this app (raw SDK/REST
+// abuse). It only activates when a reCAPTCHA v3 site key is configured, so the
+// app still runs before the App Check console setup is complete.
+//
+// Local dev: set VITE_FIREBASE_APPCHECK_DEBUG=true, run once, and copy the
+// debug token printed in the console into Firebase Console → App Check →
+// Manage debug tokens.
+const appCheckSiteKey = import.meta.env.VITE_FIREBASE_APPCHECK_SITE_KEY
+if (appCheckSiteKey) {
+  if (import.meta.env.VITE_FIREBASE_APPCHECK_DEBUG === 'true') {
+    self.FIREBASE_APPCHECK_DEBUG_TOKEN = true
+  }
+  initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider(appCheckSiteKey),
+    isTokenAutoRefreshEnabled: true,
+  })
+}
 
 export const auth = getAuth(app)
 export const db       = getFirestore(app)
