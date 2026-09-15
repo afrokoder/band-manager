@@ -5,7 +5,7 @@ import SongCard from './SongCard'
 import LyricsSheet from './LyricsSheet'
 import AddSongSheet from './AddSongSheet'
 
-const FILTERS = ['All','Slow','Medium','Upbeat','Anthem']
+const FILTERS = ['All','Worship','Praise','Afrobeats','Reggae','Praise Break','Rock & Roll','Highlife','Aria Aria (Woro)']
 
 export default function SongLibrary({ showAdd, onAddClose }) {
   const { songs, loading, addSong, updateSong, deleteSong } = useSongs()
@@ -19,7 +19,7 @@ export default function SongLibrary({ showAdd, onAddClose }) {
   const canManage = isAdmin || isBand
 
   const visible = songs.filter(s => {
-    const matchQ = !query || s.title?.toLowerCase().includes(query.toLowerCase()) || s.author?.toLowerCase().includes(query.toLowerCase()) || s.key?.toLowerCase().includes(query.toLowerCase())
+    const matchQ = !query || s.title?.toLowerCase().includes(query.toLowerCase()) || s.author?.toLowerCase().includes(query.toLowerCase())
     const matchF = filter === 'All' || s.tags?.includes(filter.toLowerCase())
     return matchQ && matchF
   })

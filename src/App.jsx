@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from './contexts/AuthContext'
 import LoginScreen from './components/Auth/LoginScreen'
 import ProfileSetup from './components/Auth/ProfileSetup'
@@ -6,9 +6,11 @@ import SongLibrary from './components/Songs/SongLibrary'
 import SetlistBuilder from './components/Setlist/SetlistBuilder'
 import Schedule from './components/Schedule/Schedule'
 import Comms from './components/Comms/Comms'
+import More from './components/More/More'
 import ProfileSheet from './components/Auth/ProfileSheet'
 import NotifBanner from './components/ui/NotifBanner'
 import NotificationBell from './components/ui/NotificationBell'
+import { useAppDialog } from './components/ui/AppDialog'
 import { syncNotifRegistration } from './utils/notifications'
 import { doc, serverTimestamp, setDoc } from 'firebase/firestore'
 import { db } from './firebase'
@@ -18,16 +20,20 @@ const TABS = [
   { id: 'setlist',  label: 'Setlist',  icon: <svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg> },
   { id: 'schedule', label: 'Schedule', icon: <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> },
   { id: 'comms',    label: 'Comms',    icon: <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> },
+  { id: 'more',     label: 'More',     icon: <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg> },
 ]
 
-const TAB_TITLES = { songs: 'Song Library', setlist: 'Set Lists', schedule: 'Schedule', comms: 'Comms' }
+const TAB_TITLES = { songs: 'Song Library', setlist: 'Set Lists', schedule: 'Schedule', comms: 'Comms', more: 'More' }
 
 export default function App() {
   const { user, profile, loading, needsProfile, isAdmin } = useAuth()
   const [tab, setTab]               = useState('songs')
   const [showAdd, setShowAdd]       = useState(false)
+
+  useEffect(() => { const openLoop=()=>{ setTab('more'); setShowAdd(false) }; window.addEventListener('agm-open-loop',openLoop); return()=>window.removeEventListener('agm-open-loop',openLoop) }, [])
   const [showProfile, setShowProfile] = useState(false)
   const [banner, setBanner]         = useState(null)
+  const initialRouteHandled = useRef(false)
 
   // Refresh an existing push registration after login, but never pop the OS
   // permission prompt automatically. iPhone requires that prompt to come from
@@ -39,7 +45,8 @@ export default function App() {
   // Notification taps can launch the installed PWA from a closed state. Honor
   // the URL route written by the service worker / Cloud Function.
   useEffect(() => {
-    if (!user || !profile) return
+    if (!user || !profile || initialRouteHandled.current) return
+    initialRouteHandled.current = true
     const params = new URLSearchParams(window.location.search)
     const requestedTab = params.get('tab')
     if (TABS.some(item => item.id === requestedTab)) setTab(requestedTab)
@@ -72,9 +79,12 @@ export default function App() {
 
   const profileGroups = profile?.groups || (profile?.group ? [profile.group] : [])
   const canAddSchedule = isAdmin || profileGroups.includes('admin') || profile?.group === 'admin'
-  const noAdd = tab === 'comms' || (tab === 'schedule' && !canAddSchedule)
+  const dialog = useAppDialog()
+  const noAdd = tab === 'comms' || tab === 'more' || (tab === 'schedule' && !canAddSchedule)
 
-  const handleNotificationNavigate = (item) => {
+  const handleNotificationNavigate = async (item) => {
+    if (window.__agmGameInProgress && !await dialog.confirm('Your current round will be lost.', { title:'Leave this game?', confirmLabel:'Leave game' })) return
+    window.__agmGameInProgress = false
     const url = new URL(window.location.href)
     if (item?.setlistId) {
       url.searchParams.set('setlist', item.setlistId)
@@ -128,13 +138,20 @@ export default function App() {
         <div className={`section ${tab === 'comms'    ? 'active' : ''}`}>
           <Comms onNewMessage={(msg) => setBanner(msg)} />
         </div>
+        <div className={`section ${tab === 'more'     ? 'active' : ''}`}>
+          <More onNavigate={(nextTab) => { setTab(nextTab); setShowAdd(false) }} />
+        </div>
       </main>
 
       {/* Tab Bar */}
       <nav className="tab-bar">
         {TABS.map(t => (
           <button key={t.id} className={`tab-item ${tab === t.id ? 'active' : ''}`}
-            onClick={() => { setTab(t.id); setShowAdd(false) }}>
+            onClick={async () => {
+              if (tab !== t.id && window.__agmGameInProgress && !await dialog.confirm('Your current round will be lost.', { title:'Leave this game?', confirmLabel:'Leave game' })) return
+              window.__agmGameInProgress = false
+              setTab(t.id); setShowAdd(false)
+            }}>
             {t.icon}
             <span>{t.label}</span>
           </button>

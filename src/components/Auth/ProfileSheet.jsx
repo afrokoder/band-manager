@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import BottomSheet from '../ui/BottomSheet'
 import Avatar from '../ui/Avatar'
 import config from '../../config'
+import { getGameLevel } from '../../utils/gameLevels'
 
 const GROUP_LABEL = config.groups
 
@@ -33,6 +34,7 @@ export default function ProfileSheet({ onClose }) {
   const displayedRoles = originalRoles
   const availableRoles = [...new Set(groups.flatMap(group => config.roles[group] || []))]
   const canSave = groups.length > 0 && roles.length > 0 && !busy
+  const gameLevel = getGameLevel(profile?.gamePoints || 0)
 
   const resetForm = () => {
     setGroups(originalGroups.filter(group => group !== 'admin'))
@@ -109,6 +111,20 @@ export default function ProfileSheet({ onClose }) {
               </span>
             )}
             <div style={{ fontSize: 13, color: 'var(--text3)' }}>{user?.email}</div>
+          </div>
+
+          <div className="profile-game-card">
+            <div>
+              <span>PLAY EXPERIENCE</span>
+              <strong>Level {gameLevel.level} · {gameLevel.name}</strong>
+              <small>{gameLevel.points} points{gameLevel.next ? ` · ${gameLevel.next.min - gameLevel.points} to next level` : ' · Top level'}</small>
+            </div>
+            <div className="profile-game-level">{gameLevel.level}</div>
+          </div>
+          <div className="profile-game-breakdown">
+            <div><span>Music</span><strong>{profile?.gameScores?.music || 0}</strong></div>
+            <div><span>Bible</span><strong>{profile?.gameScores?.bible || 0}</strong></div>
+            <div><span>Ear</span><strong>{profile?.gameScores?.ear || 0}</strong></div>
           </div>
 
           <div style={{ background: 'var(--bg)', borderRadius: 'var(--r-md)', padding: '12px 14px', marginBottom: 16 }}>

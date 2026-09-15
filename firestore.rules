@@ -110,7 +110,9 @@ service cloud.firestore {
                     && request.resource.data.get('title', '') is string
                     && request.resource.data.get('title', '').size() > 0
                     && request.resource.data.get('author', '') is string
-                    && request.resource.data.get('author', '').size() > 0;
+                    && request.resource.data.get('author', '').size() > 0
+                    && request.resource.data.get('tags', []) is list
+                    && request.resource.data.get('tags', []).size() > 0;
 
       // Existing manager behavior is preserved. The person who originally
       // added the song may also maintain their own song, but ownership cannot
@@ -121,6 +123,35 @@ service cloud.firestore {
 
       allow delete: if authed()
                     && (canManage() || resource.data.addedBy == request.auth.uid);
+    }
+
+    // ── Team files & media ───────────────────────────────────────────────────
+    // The whole signed-in team can view shared photos/videos; only admins can
+    // create or remove library entries. The matching Storage path is protected
+    // separately in storage.rules.
+    match /teamMedia/{id} {
+      allow read: if authed();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ── Learning resources ───────────────────────────────────────────────────
+    // Everyone can read learning content; only admins can publish or remove it.
+    match /learningResources/{id} {
+      allow read: if authed();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ── Private notes & learning bookmarks ──────────────────────────────────
+    match /users/{userId}/notes/{noteId} {
+      allow read, create, update, delete: if authed() && request.auth.uid == userId;
+    }
+
+    match /users/{userId}/noteFolders/{folderId} {
+      allow read, create, update, delete: if authed() && request.auth.uid == userId;
+    }
+
+    match /users/{userId}/learningBookmarks/{resourceId} {
+      allow read, create, update, delete: if authed() && request.auth.uid == userId;
     }
 
     // ── Messages ──────────────────────────────────────────────────────────────

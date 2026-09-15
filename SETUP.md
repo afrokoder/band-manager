@@ -142,3 +142,11 @@ firebase deploy
 | @band / @vocals / @all audience tags | ✅ |
 | Push notifications (FCM) | ✅ |
 | PWA (installable) | ✅ |
+
+## More v3 Firestore changes
+
+Personal Notes now supports saved folders. Deploy the updated Firestore rules:
+
+```bash
+firebase deploy --only firestore:rules
+```
