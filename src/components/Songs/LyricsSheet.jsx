@@ -18,7 +18,7 @@ export default function LyricsSheet({ song, onClose, onDelete, onEdit }) {
   return (
     <BottomSheet open onClose={onClose}
       title={song.title}
-      subtitle={`${song.author ? `${song.author} · ` : ''}Key: ${song.key} · ${song.bpm} BPM`}
+      subtitle={song.author || 'Song details'}
       action={onEdit ? { label: 'Edit', onPress: () => { onClose(); onEdit(song) } } : null}>
 
       {/* YouTube player */}

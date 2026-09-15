@@ -3,6 +3,7 @@ import { getAuth, GoogleAuthProvider } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 import { getMessaging, isSupported } from 'firebase/messaging'
+import { getFunctions } from 'firebase/functions'
 
 const firebaseConfig = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
@@ -17,6 +18,7 @@ const app = initializeApp(firebaseConfig)
 
 export const auth = getAuth(app)
 export const db       = getFirestore(app)
+export const functions = getFunctions(app)
 export const googleProvider = new GoogleAuthProvider()
 
 // Storage powers song/set-list file attachments and voice memos.

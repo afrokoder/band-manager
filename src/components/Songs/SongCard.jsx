@@ -1,9 +1,6 @@
 import { youtubeThumbnail } from '../../utils/youtube'
 
-const COLORS = ['#6366f1','#ec4899','#f59e0b','#10b981','#8b5cf6','#ef4444','#0ea5e9','#f97316','#06b6d4','#84cc16']
-
 export default function SongCard({ song, onClick }) {
-  const color = song.color || COLORS[song.title?.charCodeAt(0) % COLORS.length] || COLORS[0]
   const thumb = song.youtubeVideoId ? youtubeThumbnail(song.youtubeVideoId) : null
 
   return (
@@ -18,11 +15,19 @@ export default function SongCard({ song, onClick }) {
           </div>
         </div>
       ) : (
-        <div className="song-card-bar" style={{ background: color }} />
+        <div className="song-generated-thumb song-generated-thumb-light">
+          <div className="song-cover-wave wave-one" aria-hidden="true" />
+          <div className="song-cover-wave wave-two" aria-hidden="true" />
+          <div className="song-cover-wave wave-three" aria-hidden="true" />
+          <div className="song-generated-copy">
+            <strong>{song.title}</strong>
+            <span>{song.author || 'Amazing Voices'}</span>
+          </div>
+          <div className="song-thumb-footer"><b>AGM</b><i/><span>AMAZING VOICES · MUSIC LIBRARY</span></div>
+        </div>
       )}
       <div className="song-card-title">{song.title}</div>
       {song.author && <div className="song-card-author">{song.author}</div>}
-      <div className="song-card-meta">{song.key} · {song.bpm} BPM</div>
       <div className="song-card-tags">
         {song.tags?.map(t => <span key={t} className="tag">{t}</span>)}
       </div>

@@ -5,8 +5,7 @@ import { extractYouTubeId, youtubeThumbnail } from '../../utils/youtube'
 import { uploadMediaFile } from '../../utils/mediaUpload'
 import SongMediaFields from './SongMediaFields'
 
-const KEYS  = ['A','Bb','B','C','C#','D','Eb','E','F','F#','G','Ab']
-const TAGS  = ['slow','medium','upbeat','anthem']
+const TAGS  = ['worship','praise','afrobeats','reggae','praise break','rock & roll','highlife','aria aria (woro)']
 const COLORS= ['#6366f1','#ec4899','#f59e0b','#10b981','#8b5cf6','#ef4444','#0ea5e9','#f97316','#06b6d4','#84cc16']
 
 const empty = () => ({ label: 'Verse 1', chords: '', lyrics: '' })
@@ -22,9 +21,7 @@ export default function AddSongSheet({ open, onClose, onSave, song: editSong }) 
 
   const [title,    setTitle]    = useState('')
   const [author,   setAuthor]   = useState('')
-  const [key,      setKey]      = useState('D')
-  const [bpm,      setBpm]      = useState('')
-  const [tag,      setTag]      = useState('slow')
+  const [tag,      setTag]      = useState('')
   const [notes,    setNotes]    = useState('')
   const [sections, setSections] = useState([empty()])
   const [ytUrl,    setYtUrl]    = useState('')
@@ -37,9 +34,7 @@ export default function AddSongSheet({ open, onClose, onSave, song: editSong }) 
     if (editSong) {
       setTitle(editSong.title || '')
       setAuthor(editSong.author || '')
-      setKey(editSong.key || 'D')
-      setBpm(editSong.bpm?.toString() || '')
-      setTag(editSong.tags?.[0] || 'slow')
+      setTag(editSong.tags?.[0] || '')
       setNotes(editSong.notes || '')
       setSections(editSong.sections?.length ? editSong.sections : [empty()])
       setYtUrl(editSong.youtubeUrl || '')
@@ -47,7 +42,7 @@ export default function AddSongSheet({ open, onClose, onSave, song: editSong }) 
       setVoiceMemo(null)
     } else {
       // Reset for add mode
-      setTitle(''); setAuthor(''); setKey('D'); setBpm(''); setTag('slow')
+      setTitle(''); setAuthor(''); setTag('')
       setNotes(''); setSections([empty()]); setYtUrl('')
       setAttachment(null); setVoiceMemo(null)
     }
@@ -60,7 +55,7 @@ export default function AddSongSheet({ open, onClose, onSave, song: editSong }) 
   const ytVideoId = extractYouTubeId(ytUrl)
   const hasLyrics = sections.some(section => section.lyrics?.trim())
   const hasMedia = !!(ytVideoId || attachment || voiceMemo || editSong?.attachment || editSong?.voiceMemo || editSong?.fileUrl)
-  const canSubmit = !!title.trim() && !!author.trim() && hasMedia && hasLyrics
+  const canSubmit = !!title.trim() && !!author.trim() && !!tag && hasMedia && hasLyrics
 
   const submit = async () => {
     if (!canSubmit) return
@@ -74,8 +69,6 @@ export default function AddSongSheet({ open, onClose, onSave, song: editSong }) 
       const data = {
         title: title.trim(),
         author: author.trim(),
-        key,
-        bpm: parseInt(bpm) || 80,
         tags: [tag],
         notes,
         sections,
@@ -108,21 +101,8 @@ export default function AddSongSheet({ open, onClose, onSave, song: editSong }) 
         <input className="form-input" placeholder="Songwriter / artist" value={author} onChange={e => setAuthor(e.target.value)} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <div className="form-row">
-          <label className="form-label">Key</label>
-          <select className="form-select" value={key} onChange={e => setKey(e.target.value)}>
-            {KEYS.map(k => <option key={k}>{k}</option>)}
-          </select>
-        </div>
-        <div className="form-row">
-          <label className="form-label">BPM</label>
-          <input className="form-input" type="number" placeholder="72" value={bpm} onChange={e => setBpm(e.target.value)} />
-        </div>
-      </div>
-
       <div className="form-row">
-        <label className="form-label">Mood</label>
+        <label className="form-label">Mood <span style={{ color: 'var(--danger)' }}>*</span></label>
         <div className="chips" style={{ paddingBottom: 0 }}>
           {TAGS.map(t => (
             <div key={t} className={`chip ${tag === t ? 'active' : ''}`} onClick={() => setTag(t)}>{t}</div>

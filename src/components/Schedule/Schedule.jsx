@@ -5,6 +5,7 @@ import { useSetlists, useSetlistLookup } from '../../hooks/useSetlists'
 import { SetlistViewer } from '../Setlist/SetlistBuilder'
 import { useAuth } from '../../contexts/AuthContext'
 import BottomSheet from '../ui/BottomSheet'
+import { useAppDialog } from '../ui/AppDialog'
 import Avatar from '../ui/Avatar'
 import config from '../../config'
 
@@ -471,40 +472,22 @@ function ServiceCard({ service, members, canManage, onEdit, currentUserId, setli
   const dayNumber = serviceDate.getUTCDate()
 
   return (
-    <div data-service-id={service.id} className={`schedule-service-card ${isNext ? 'up-next' : ''} ${focused ? 'notification-focus' : ''}`.trim()}>
+    <div data-service-id={service.id} className={`schedule-service-card ${isNext ? 'next-service-card' : ''} ${focused ? 'notification-focus' : ''}`.trim()}>
+      {isNext && <div className="next-service-banner"><i/>Next Up · Sunday Service</div>}
       {/* Header */}
-      {isNext ? (
-        <div className="up-next-hero">
-          <div className="up-next-date-tile">
-            <span>{monthName}</span>
-            <strong>{dayNumber}</strong>
-            <small>{dayName}</small>
-          </div>
-          <div className="up-next-copy">
-            <div className="up-next-label"><span>●</span> NEXT SERVICE</div>
-            <div className="up-next-title">Sunday Service</div>
-            <div className="up-next-date-line">{service.dateStr}</div>
-            {iAmIn && <div className="up-next-assigned">★ You're assigned to this service</div>}
-          </div>
-          {canManage && (
-            <button className="schedule-edit-btn up-next-edit" onClick={() => onEdit(service)} aria-label="Edit service assignments">✎</button>
+      <div className="schedule-service-head">
+        <div style={{ flex: 1 }}>
+          <div className="schedule-service-date">{service.dateStr}</div>
+          {iAmIn && (
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)', marginTop: 2 }}>
+              ★ You're assigned this Sunday
+            </div>
           )}
         </div>
-      ) : (
-        <div className="schedule-service-head">
-          <div style={{ flex: 1 }}>
-            <div className="schedule-service-date">{service.dateStr}</div>
-            {iAmIn && (
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)', marginTop: 2 }}>
-                ★ You're assigned this Sunday
-              </div>
-            )}
-          </div>
-          {canManage && (
-            <button className="schedule-edit-btn" onClick={() => onEdit(service)} aria-label="Edit service assignments">✎</button>
-          )}
-        </div>
-      )}
+        {canManage && (
+          <button className="schedule-edit-btn" onClick={() => onEdit(service)} aria-label="Edit service assignments">✎</button>
+        )}
+      </div>
 
       {/* Section rows */}
       <div style={{ padding: '4px 16px 14px' }}>
@@ -612,6 +595,7 @@ function ServiceCard({ service, members, canManage, onEdit, currentUserId, setli
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export default function Schedule({ showAdd, onAddClose }) {
+  const dialog = useAppDialog()
   const { rehearsals, loading: rLoading, addRehearsal, updateRehearsal, deleteRehearsal, submitRsvp, ensureMonthlyRehearsals } = useRehearsals()
   const { services,   loading: sLoading, addService,   updateService,   deleteService }               = useServices()
   const { user, isAdmin, profile } = useAuth()
@@ -774,7 +758,7 @@ export default function Schedule({ showAdd, onAddClose }) {
         onClose={() => setViewingSetlist(null)}
         canDelete={!!viewingSetlist && (isAdmin || viewingSetlist.createdBy === user?.uid) && (viewingSetlist.serviceDateTs || 0) >= new Date().setHours(0, 0, 0, 0)}
         onDelete={async () => {
-          if (!viewingSetlist || !window.confirm('Delete this set list? This will unassign it from the service.')) return
+          if (!viewingSetlist || !await dialog.confirm('This will unassign it from the service.', { title:'Delete this set list?', confirmLabel:'Delete', tone:'danger' })) return
           await deleteSetlist(viewingSetlist)
           setViewingSetlist(null)
         }}

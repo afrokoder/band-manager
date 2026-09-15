@@ -6,15 +6,17 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useSetlists, useSetlistViews } from '../../hooks/useSetlists'
 import { useServices } from '../../hooks/useServices'
 import { useSongs } from '../../hooks/useSongs'
+import { useLoops } from '../../hooks/useLoops'
 import { extractYouTubeId, youtubeThumbnail } from '../../utils/youtube'
 import { uploadMediaFile } from '../../utils/mediaUpload'
 import BottomSheet from '../ui/BottomSheet'
+import { useAppDialog } from '../ui/AppDialog'
 import SongMediaFields from '../Songs/SongMediaFields'
 import { createSetlistPdfFile, downloadPdfFile } from '../../utils/pdfExport'
 
 const ELIGIBLE_SECTIONS = ['Morning Worship', 'Praise', 'Worship', 'Offering']
 const KEYS = ['A', 'Bb', 'B', 'C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab']
-const TAGS = ['slow', 'medium', 'upbeat', 'anthem']
+const TAGS = ['worship', 'praise', 'afrobeats', 'reggae', 'praise break', 'rock & roll', 'highlife', 'aria aria (woro)']
 const COLORS = ['#6366f1','#ec4899','#f59e0b','#10b981','#8b5cf6','#ef4444','#0ea5e9','#f97316','#06b6d4','#84cc16']
 const STEPS = ['Details', 'Songs', 'Set Settings', 'Review']
 const emptySongSection = () => ({ label: 'Verse 1', chords: '', lyrics: '' })
@@ -62,9 +64,7 @@ function ManualSongForm({ onAdd, userId }) {
   const { addSong } = useSongs()
   const [title, setTitle] = useState('')
   const [author, setAuthor] = useState('')
-  const [key, setKey] = useState('D')
-  const [bpm, setBpm] = useState('')
-  const [tag, setTag] = useState('slow')
+  const [tag, setTag] = useState('')
   const [notes, setNotes] = useState('')
   const [sections, setSections] = useState([emptySongSection()])
   const [ytUrl, setYtUrl] = useState('')
@@ -75,16 +75,16 @@ function ManualSongForm({ onAdd, userId }) {
   const videoId = extractYouTubeId(ytUrl)
   const hasLyrics = sections.some(section => section.lyrics?.trim())
   const hasMedia = !!(videoId || attachment || voiceMemo)
-  const canAdd = !!title.trim() && !!author.trim() && hasMedia && hasLyrics
+  const canAdd = !!title.trim() && !!author.trim() && !!tag && hasMedia && hasLyrics
 
   const reset = () => {
-    setTitle(''); setAuthor(''); setKey('D'); setBpm(''); setTag('slow'); setNotes('')
+    setTitle(''); setAuthor(''); setTag(''); setNotes('')
     setSections([emptySongSection()]); setYtUrl(''); setAttachment(null); setVoiceMemo(null); setError('')
   }
 
   const submit = async () => {
     if (!canAdd) {
-      setError('Title, author, lyrics, and either a valid YouTube link, attached file, or voice memo are required.')
+      setError('Title, author, mood, lyrics, and either a valid YouTube link, attached file, or voice memo are required.')
       return
     }
     setBusy(true); setError('')
@@ -94,7 +94,7 @@ function ManualSongForm({ onAdd, userId }) {
         voiceMemo ? uploadMediaFile(voiceMemo, userId, 'songs') : Promise.resolve(null),
       ])
       const data = {
-        title: title.trim(), author: author.trim(), key, bpm: parseInt(bpm) || 80, tags: [tag], notes,
+        title: title.trim(), author: author.trim(), tags: [tag], notes,
         sections, youtubeUrl: ytUrl.trim() || null, youtubeVideoId: videoId || null,
         attachment: uploadedAttachment, voiceMemo: uploadedVoiceMemo,
         color: COLORS[Math.floor(Math.random() * COLORS.length)], addedBy: userId,
@@ -119,11 +119,7 @@ function ManualSongForm({ onAdd, userId }) {
     <div className="setlist-manual-card">
       <div className="form-row"><label className="form-label">Title <span style={{ color: 'var(--danger)' }}>*</span></label><input className="form-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="Song title" /></div>
       <div className="form-row"><label className="form-label">Author <span style={{ color: 'var(--danger)' }}>*</span></label><input className="form-input" value={author} onChange={e => setAuthor(e.target.value)} placeholder="Songwriter / artist" /></div>
-      <div className="setlist-two-col">
-        <div className="form-row"><label className="form-label">Key</label><select className="form-select" value={key} onChange={e => setKey(e.target.value)}>{KEYS.map(item => <option key={item}>{item}</option>)}</select></div>
-        <div className="form-row"><label className="form-label">BPM</label><input className="form-input" type="number" value={bpm} onChange={e => setBpm(e.target.value)} placeholder="72" /></div>
-      </div>
-      <div className="form-row"><label className="form-label">Mood</label><div className="chips">{TAGS.map(item => <button type="button" key={item} className={`chip ${tag === item ? 'active' : ''}`} onClick={() => setTag(item)}>{item}</button>)}</div></div>
+      <div className="form-row"><label className="form-label">Mood <span style={{ color: 'var(--danger)' }}>*</span></label><div className="chips">{TAGS.map(item => <button type="button" key={item} className={`chip ${tag === item ? 'active' : ''}`} onClick={() => setTag(item)}>{item}</button>)}</div></div>
       <div className="form-row">
         <label className="form-label">YouTube Link <span className="optional">(YouTube link, attachment, or voice memo required)</span></label>
         <input className="form-input" value={ytUrl} onChange={e => setYtUrl(e.target.value)} placeholder="https://youtu.be/..." />
@@ -198,6 +194,7 @@ function SongAction({ song }) {
 }
 
 function SetlistViewer({ setlist, onClose, canEdit = false, canDelete = canEdit, onEdit, onDelete }) {
+  const dialog = useAppDialog()
   const { user, isAdmin } = useAuth()
   const { songs: librarySongs } = useSongs()
   const canSeeViews = !!setlist && (isAdmin || setlist.createdBy === user?.uid)
@@ -229,12 +226,12 @@ function SetlistViewer({ setlist, onClose, canEdit = false, canDelete = canEdit,
         })
       } else {
         downloadPdfFile(pdfFile)
-        window.alert('This device does not support sharing PDF files directly, so the set list PDF was downloaded instead.')
+        dialog.alert('This device does not support sharing PDF files directly, so the set list PDF was downloaded instead.', { title:'PDF downloaded' })
       }
     } catch (err) {
       if (err?.name !== 'AbortError') {
         console.error('Could not create/share set list PDF:', err)
-        window.alert('Could not create the set list PDF. Please try again.')
+        dialog.alert('Could not create the set list PDF. Please try again.', { title:'PDF error', tone:'danger' })
       }
     } finally {
       setSharingPdf(false)
@@ -256,7 +253,7 @@ function SetlistViewer({ setlist, onClose, canEdit = false, canDelete = canEdit,
       <div className="setlist-meta-row">
         <span>Key <strong>{setlist.setKey || '—'}</strong></span>
         <span>Tempo <strong>{setlist.tempo ? `${setlist.tempo} BPM` : '—'}</strong></span>
-        <span>Loop <strong>{setlist.loopName || 'None'}</strong></span>
+        <span>Loop {setlist.loopSrc ? <button type="button" className="setlist-loop-link" onClick={()=>{window.dispatchEvent(new CustomEvent('agm-open-loop',{detail:{src:setlist.loopSrc}}));onClose()}}><strong>{setlist.loopName || 'Open loop'}</strong> ›</button> : <strong>None</strong>}</span>
       </div>
       <div className="setlist-view-list">
         {(setlist.songs || []).map((song, index) => (
@@ -304,10 +301,12 @@ function SetlistViewer({ setlist, onClose, canEdit = false, canDelete = canEdit,
 export { SetlistViewer }
 
 export default function SetlistBuilder({ showAdd, onAddClose }) {
+  const dialog = useAppDialog()
   const { user, profile, isAdmin } = useAuth()
   const { songs: librarySongs } = useSongs()
   const { services } = useServices()
   const { setlists, loading, createSetlist, updateSetlist, deleteSetlist } = useSetlists()
+  const { loops } = useLoops()
 
   const [tab, setTab] = useState('upcoming')
   const [creating, setCreating] = useState(false)
@@ -323,6 +322,7 @@ export default function SetlistBuilder({ showAdd, onAddClose }) {
   const [setKey, setSetKey] = useState('')
   const [tempo, setTempo] = useState('')
   const [loopName, setLoopName] = useState('')
+  const [loopSrc, setLoopSrc] = useState('')
   const [notes, setNotes] = useState('')
   const [attachment, setAttachment] = useState(null)
   const [voiceMemo, setVoiceMemo] = useState(null)
@@ -362,14 +362,14 @@ export default function SetlistBuilder({ showAdd, onAddClose }) {
 
   const resetBuilder = () => {
     setEditing(null); setStep(1); setServiceId(''); setSection(''); setTitle(''); setSelectedSongs([])
-    setSongMode('library'); setSongQuery(''); setSetKey(''); setTempo(''); setLoopName(''); setNotes('')
+    setSongMode('library'); setSongQuery(''); setSetKey(''); setTempo(''); setLoopName(''); setLoopSrc(''); setNotes('')
     setAttachment(null); setVoiceMemo(null); setSaveError('')
   }
   const openCreate = () => { resetBuilder(); setCreating(true); onAddClose?.() }
   const openEdit = (item) => {
     setEditing(item); setServiceId(item.serviceId || ''); setSection(item.section || ''); setTitle(item.title || '')
     setSelectedSongs(item.songs || []); setSetKey(item.setKey || ''); setTempo(item.tempo?.toString?.() || '')
-    setLoopName(item.loopName || ''); setNotes(item.notes || ''); setAttachment(null); setVoiceMemo(null); setSaveError(''); setStep(1); setCreating(true)
+    setLoopName(item.loopName || ''); setLoopSrc(item.loopSrc || ''); setNotes(item.notes || ''); setAttachment(null); setVoiceMemo(null); setSaveError(''); setStep(1); setCreating(true)
   }
   useEffect(() => { if (showAdd && !creating) openCreate() }, [showAdd])
   useEffect(() => {
@@ -405,7 +405,8 @@ export default function SetlistBuilder({ showAdd, onAddClose }) {
     return {
       serviceId, serviceDateStr: selectedService?.dateStr || editing?.serviceDateStr || '', serviceDateTs: selectedService?.dateTs || editing?.serviceDateTs || 0,
       section, title: title.trim() || `${section} Set List`, songs: selectedSongs, setKey: setKey || null,
-      tempo: parseInt(tempo) || null, loopName: loopName || null, notes: notes.trim() || null,
+      tempo: parseInt(tempo) || null, loopName: loopName || null, loopSrc: loopSrc || null,
+      loopBpm: loops.find(loop => loop.src === loopSrc)?.bpm || null, loopKey: loops.find(loop => loop.src === loopSrc)?.key || null, notes: notes.trim() || null,
       attachment: uploadedAttachment || editing?.attachment || null, voiceMemo: uploadedVoiceMemo || editing?.voiceMemo || null,
       status, createdBy: editing?.createdBy || user?.uid, createdByName: editing?.createdByName || profile?.name || '',
       ...(status === 'published' && !isPublished(editing?.status) ? { submittedAt: new Date() } : {}),
@@ -429,7 +430,7 @@ export default function SetlistBuilder({ showAdd, onAddClose }) {
   const canManageItem = item => (isAdmin || item.createdBy === myId) && (item.serviceDateTs || 0) >= today.getTime()
   const handleDelete = async item => {
     if (!canManageItem(item)) return
-    if (!window.confirm('Delete this set list? This will remove it from the service.')) return
+    if (!await dialog.confirm('This will remove it from the service.', { title:'Delete this set list?', confirmLabel:'Delete', tone:'danger' })) return
     await deleteSetlist(item)
     setViewing(null)
   }
@@ -484,10 +485,10 @@ export default function SetlistBuilder({ showAdd, onAddClose }) {
         </>}
 
         {step === 3 && <>
-          <div className="setlist-builder-heading">Set Settings</div><p className="setlist-builder-subtext">Key and tempo apply to the whole set. Loop selection is shown now and can be connected when your loop library is added.</p>
+          <div className="setlist-builder-heading">Set Settings</div><p className="setlist-builder-subtext">Key and tempo apply to the whole set. Choose an optional AGM loop from the shared Loop Player library.</p>
           <div className="form-row"><label className="form-label">Set key <span className="optional">(optional)</span></label><div className="setlist-key-grid">{KEYS.map(key => <button type="button" key={key} className={setKey === key ? 'active' : ''} onClick={() => setSetKey(setKey === key ? '' : key)}>{key}</button>)}</div></div>
           <div className="form-row"><label className="form-label">Set tempo <span className="optional">(optional)</span></label><input className="form-input" type="number" inputMode="numeric" value={tempo} onChange={e => setTempo(e.target.value)} placeholder="e.g. 72 BPM" /></div>
-          <div className="setlist-loop-card"><div><strong>Loop Track</strong><span>Loop library coming soon.</span></div><button type="button" disabled>{loopName || 'Choose Loop'}</button></div>
+          <div className="form-row"><label className="form-label">Loop track <span className="optional">(optional)</span></label><select className="form-select" value={loopSrc} onChange={e => { const src=e.target.value; const loop=loops.find(item=>item.src===src); setLoopSrc(src); setLoopName(loop?.name||'') }}><option value="">No loop</option>{loops.map(loop => <option key={loop.src} value={loop.src}>{loop.name}{loop.bpm ? ` · ${loop.bpm} BPM` : ''}{loop.key ? ` · ${loop.key}` : ''}</option>)}</select><small className="setlist-loop-help">Loops come from the same AGM Loop Player library under More → Tools.</small></div>
           <div className="form-row" style={{ marginTop: 16 }}><label className="form-label">Team notes <span className="optional">(optional)</span></label><textarea className="form-textarea" rows={3} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Add reminders for the team…" /></div>
           <div className="setlist-submission-media-form"><span className="form-label">Set list media <span className="optional">(optional)</span></span><p>Attach a team file or voice memo. These are only shown when viewing this set list and are not added to the Song Library.</p><SongMediaFields attachment={attachment} voiceMemo={voiceMemo} onAttachmentChange={setAttachment} onVoiceMemoChange={setVoiceMemo} /></div>
         </>}

@@ -6,7 +6,7 @@ import {
   signOut,
   onAuthStateChanged,
 } from 'firebase/auth'
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore'
+import { arrayUnion, doc, getDoc, increment, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db, googleProvider } from '../firebase'
 
 const AuthContext = createContext(null)
@@ -102,6 +102,37 @@ export function AuthProvider({ children }) {
     setProfile(current => ({ ...current, ...data, updatedAt: new Date() }))
   }
 
+
+  const recordGameResult = async ({ points, gameType, difficulty = 'standard', questionIds = [] }) => {
+    const uid = auth.currentUser?.uid
+    const amount = Math.max(0, Number(points) || 0)
+    if (!uid || !gameType) return
+    const seenKey = `${gameType}_${difficulty}`
+    const scoreField = `gameScores.${gameType}`
+    const playedField = `gamesPlayedByType.${gameType}`
+    const seenField = `gameSeen.${seenKey}`
+    const update = {
+      gamePoints: increment(amount),
+      gamesPlayed: increment(1),
+      [scoreField]: increment(amount),
+      [playedField]: increment(1),
+      lastGameAt: serverTimestamp(),
+    }
+    if (questionIds.length) update[seenField] = arrayUnion(...questionIds)
+    await updateDoc(doc(db, 'users', uid), update)
+    setProfile(current => ({
+      ...current,
+      gamePoints: (Number(current?.gamePoints) || 0) + amount,
+      gamesPlayed: (Number(current?.gamesPlayed) || 0) + 1,
+      gameScores: { ...(current?.gameScores || {}), [gameType]: (Number(current?.gameScores?.[gameType]) || 0) + amount },
+      gamesPlayedByType: { ...(current?.gamesPlayedByType || {}), [gameType]: (Number(current?.gamesPlayedByType?.[gameType]) || 0) + 1 },
+      gameSeen: { ...(current?.gameSeen || {}), [seenKey]: [...new Set([...(current?.gameSeen?.[seenKey] || []), ...questionIds])] },
+      lastGameAt: new Date(),
+    }))
+  }
+
+  const addGamePoints = async (points, gameType = 'general') => recordGameResult({ points, gameType })
+
   const loginEmail = (email, password) =>
     signInWithEmailAndPassword(auth, email, password)
 
@@ -116,7 +147,7 @@ export function AuthProvider({ children }) {
   const isAdmin = profileGroups.includes('admin') || profile?.group === 'admin'
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, needsProfile, isAdmin, loginEmail, registerEmail, loginGoogle, logout, saveProfile, updateProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, needsProfile, isAdmin, loginEmail, registerEmail, loginGoogle, logout, saveProfile, updateProfile, addGamePoints, recordGameResult }}>
       {children}
     </AuthContext.Provider>
   )
