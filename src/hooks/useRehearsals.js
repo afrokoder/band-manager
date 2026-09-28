@@ -29,14 +29,27 @@ function saturdaysInMonth(year, month) {
   return dates
 }
 
-// A month becomes eligible after the last Sunday of the previous month has passed.
-// Example: September rehearsals are eligible starting the Monday after August's last Sunday.
-function monthCreationThreshold(year, month) {
-  const lastDayPreviousMonth = new Date(year, month, 0)
-  const lastSunday = new Date(lastDayPreviousMonth)
-  lastSunday.setDate(lastDayPreviousMonth.getDate() - lastDayPreviousMonth.getDay())
-  lastSunday.setHours(23, 59, 59, 999)
-  return lastSunday.getTime()
+// The next month becomes eligible as soon as the current month has no
+// Saturdays left. In other words, once the final Saturday has fully passed,
+// the following month's rehearsal schedule is created immediately.
+function lastSaturdayOfMonth(year, month) {
+  const lastDay = new Date(year, month + 1, 0)
+  const lastSaturday = new Date(lastDay)
+  lastSaturday.setDate(lastDay.getDate() - ((lastDay.getDay() + 1) % 7))
+  lastSaturday.setHours(23, 59, 59, 999)
+  return lastSaturday
+}
+
+function rehearsalMonthToEnsure(now) {
+  const currentYear = now.getFullYear()
+  const currentMonth = now.getMonth()
+
+  if (now.getTime() > lastSaturdayOfMonth(currentYear, currentMonth).getTime()) {
+    const nextMonth = new Date(currentYear, currentMonth + 1, 1)
+    return { year: nextMonth.getFullYear(), month: nextMonth.getMonth() }
+  }
+
+  return { year: currentYear, month: currentMonth }
 }
 
 export function useRehearsals() {
@@ -118,11 +131,11 @@ export function useRehearsals() {
     })
   }
 
-  // Idempotently creates this month's Saturday rehearsals once the previous month's
-  // last Sunday has passed. Existing Saturday items are preserved and never duplicated.
+  // Idempotently keeps the active rehearsal month ready. During a month we ensure
+  // that month's Saturdays exist; immediately after its final Saturday passes, we
+  // switch ahead and create the following month's Saturdays. Existing items are preserved.
   const ensureMonthlyRehearsals = async (now = new Date()) => {
-    const year = now.getFullYear()
-    const month = now.getMonth()
+    const { year, month } = rehearsalMonthToEnsure(now)
 
     // Backfill the RSVP lock timestamp on older rehearsal documents so the
     // same day-of-rehearsal lock is enforced by Firestore, not only the UI.
@@ -133,8 +146,6 @@ export function useRehearsals() {
         })
       }
     }
-
-    if (now.getTime() <= monthCreationThreshold(year, month)) return
 
     const saturdays = saturdaysInMonth(year, month)
     let createdCount = 0

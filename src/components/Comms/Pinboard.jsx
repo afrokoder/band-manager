@@ -14,41 +14,37 @@ function PinRow({ pin }) {
   const hasBody = !!pin.body?.trim()
 
   return (
-    <div>
+    <div className="pinboard-pin">
       <div
+        className="pinboard-pin-row"
         onClick={() => hasBody && setOpen(o => !o)}
-        style={{
-          display: 'flex', alignItems: 'flex-start', gap: 10,
-          padding: '10px 0',
-          cursor: hasBody ? 'pointer' : 'default',
-        }}
+        style={{ cursor: hasBody ? 'pointer' : 'default' }}
       >
-        <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0, marginTop: 1 }}>{pin.emoji || '📌'}</span>
+        <span className="pinboard-pin-icon">{pin.emoji || '📌'}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
           {pin.url ? (
             <a href={pin.url} target="_blank" rel="noopener noreferrer"
               onClick={e => e.stopPropagation()}
-              style={{ fontSize: 14, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none', wordBreak: 'break-all' }}>
+              style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)', textDecoration: 'none', wordBreak: 'break-word' }}>
               {pin.title}
             </a>
           ) : (
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text1)' }}>{pin.title}</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text1)' }}>{pin.title}</div>
           )}
-          {hasBody && !open && (
-            <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {hasBody && (
+            <div style={{
+              fontSize: 12, color: open ? 'var(--text2)' : 'var(--text3)', marginTop: 3, lineHeight: 1.45,
+              whiteSpace: open ? 'pre-wrap' : 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
               {pin.body}
             </div>
           )}
-          {hasBody && open && (
-            <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 4, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
-              {pin.body}
-            </div>
+          {pin.url && (
+            <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>Open link ↗</div>
           )}
         </div>
         {hasBody && (
-          <span style={{ fontSize: 12, color: 'var(--text3)', flexShrink: 0, marginTop: 3 }}>
-            {open ? '▲' : '▼'}
-          </span>
+          <span style={{ fontSize: 11, color: 'var(--text3)', flexShrink: 0, marginTop: 4 }}>{open ? '▲' : '▼'}</span>
         )}
       </div>
     </div>
@@ -241,65 +237,35 @@ export default function Pinboard({ isAdmin }) {
   const [collapsed, setCollapsed] = useState(false)
   const [managing,  setManaging]  = useState(false)
 
-  // Don't render the card at all if there are no pins and user isn't admin
   if (!loading && pins.length === 0 && !isAdmin) return null
 
   return (
     <>
-      <div style={{
-        background: 'var(--surface)',
-        borderRadius: 'var(--r-md)',
-        marginBottom: 12,
-        boxShadow: '0 1px 3px rgba(0,0,0,0.07)',
-        overflow: 'hidden',
-      }}>
-        {/* Header row */}
-        <div
-          onClick={() => setCollapsed(c => !c)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '12px 14px',
-            cursor: 'pointer',
-            borderBottom: collapsed ? 'none' : '1px solid var(--border)',
-          }}
-        >
-          <span style={{ fontSize: 16 }}>📌</span>
-          <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: 'var(--text1)' }}>
-            Pinned Info
-            {pins.length > 0 && (
-              <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 600, background: 'var(--accent)', color: '#fff', borderRadius: 20, padding: '1px 7px' }}>
-                {pins.length}
-              </span>
-            )}
-          </span>
+      <div className="pinboard-card">
+        <div className="pinboard-head" onClick={() => setCollapsed(c => !c)}>
+          <span className="pinboard-head-icon">📌</span>
+          <div className="pinboard-title">
+            <strong>Pinned Info</strong>
+            <span>{pins.length > 0 ? `${pins.length} ${pins.length === 1 ? 'important item' : 'important items'}` : 'Important team info in one place'}</span>
+          </div>
 
           {isAdmin && (
-            <button
-              onClick={e => { e.stopPropagation(); setManaging(true) }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--accent)', fontWeight: 600, padding: '2px 8px', borderRadius: 6 }}>
+            <button className="pinboard-edit" onClick={e => { e.stopPropagation(); setManaging(true) }}>
               Edit
             </button>
           )}
-
-          <span style={{ fontSize: 12, color: 'var(--text3)' }}>{collapsed ? '▼' : '▲'}</span>
+          <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 1 }}>{collapsed ? '▼' : '▲'}</span>
         </div>
 
-        {/* Pins list */}
         {!collapsed && (
-          <div style={{ padding: '0 14px' }}>
+          <div className="pinboard-body">
             {loading ? (
               <div style={{ display: 'flex', justifyContent: 'center', padding: 16 }}><div className="spinner" /></div>
             ) : pins.length === 0 ? (
-              <div style={{ padding: '12px 0', fontSize: 13, color: 'var(--text3)', textAlign: 'center' }}>
-                No pins yet — tap Edit to add links and announcements.
-              </div>
+              <div className="pinboard-empty">No pins yet — tap Edit to add links and announcements.</div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', divide: 'border' }}>
-                {pins.map((pin, idx) => (
-                  <div key={pin.id} style={{ borderBottom: idx < pins.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                    <PinRow pin={pin} />
-                  </div>
-                ))}
+              <div className="pinboard-list">
+                {pins.map(pin => <PinRow key={pin.id} pin={pin} />)}
               </div>
             )}
           </div>

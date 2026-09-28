@@ -628,8 +628,9 @@ export default function Schedule({ showAdd, onAddClose }) {
     [rehearsals, todayTs]
   )
 
-  // Automatic Saturday rehearsals are created idempotently after the previous
-  // month's last Sunday has passed. Admin permissions keep schedule writes controlled.
+  // Keep Saturday rehearsals ready idempotently. As soon as the current month's
+  // final Saturday has passed, the next month's rehearsals are created immediately.
+  // Admin permissions keep schedule writes controlled.
   useEffect(() => {
     if (!isAdmin || rLoading) return
     ensureMonthlyRehearsals().catch(error => {
@@ -700,7 +701,7 @@ export default function Schedule({ showAdd, onAddClose }) {
             <div className="empty-state">
               <div className="empty-state-icon">📅</div>
               <div className="empty-state-title">No upcoming rehearsals</div>
-              <div className="empty-state-text">Saturday rehearsals will appear automatically for the active month</div>
+              <div className="empty-state-text">Saturday rehearsals appear automatically, with the next month created after this month’s final Saturday</div>
             </div>
           ) : (
             visibleRehearsals.map(r => (
