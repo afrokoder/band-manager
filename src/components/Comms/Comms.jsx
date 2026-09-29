@@ -462,6 +462,7 @@ export default function Comms({ onNewMessage }) {
   const [aud,    setAud]    = useState('all')
   const [busy,   setBusy]   = useState(false)
   const [thread, setThread] = useState(null)
+  const [teamFilter, setTeamFilter] = useState('all')
   const prevCount = useRef(0)
 
   useEffect(() => {
@@ -507,6 +508,9 @@ export default function Comms({ onNewMessage }) {
   const visible = messages.filter(m =>
     m.audience === 'all' || userGroups.includes(m.audience) || m.senderId === user?.uid
   )
+  const filteredMessages = visible.filter(m =>
+    teamFilter === 'all' ? true : m.audience === teamFilter
+  )
 
   return (
     <>
@@ -536,7 +540,24 @@ export default function Comms({ onNewMessage }) {
         </div>
       </div>
 
-      {visible.some(m => m.senderId === user?.uid) && (
+      <div className="comms-team-filter" aria-label="Filter messages by team">
+        {[
+          ['all', 'All'],
+          ['band', '@band'],
+          ['vocals', '@vocals'],
+        ].map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            className={`comms-team-filter-btn ${teamFilter === value ? 'active' : ''}`}
+            onClick={() => setTeamFilter(value)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {filteredMessages.some(m => m.senderId === user?.uid) && (
         <p style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'center', margin: '-4px 0 12px' }}>
           ← swipe left to edit · swipe right to delete →
         </p>
@@ -544,11 +565,13 @@ export default function Comms({ onNewMessage }) {
 
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><div className="spinner" /></div>
-      ) : visible.length === 0 ? (
-        <div className="msg-empty">No messages yet.<br />Be the first to say something! 👋</div>
+      ) : filteredMessages.length === 0 ? (
+        <div className="msg-empty">
+          {teamFilter === 'all' ? <>No messages yet.<br />Be the first to say something! 👋</> : <>No {AUD_LABELS[teamFilter]} messages yet.</>}
+        </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {visible.map(m => (
+          {filteredMessages.map(m => (
             <SwipeableMessageCard key={m.id} msg={m} isOwn={m.senderId === user?.uid}
               onReply={setThread} onEdit={handleEdit} onDelete={handleDelete} />
           ))}
