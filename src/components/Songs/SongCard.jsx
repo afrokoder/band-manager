@@ -1,17 +1,21 @@
+import { useState } from 'react'
 import { youtubeThumbnail } from '../../utils/youtube'
 
 export default function SongCard({ song, onClick }) {
-  const thumb = song.youtubeVideoId ? youtubeThumbnail(song.youtubeVideoId) : null
+  const [imageFailed, setImageFailed] = useState(false)
+  const youtubeThumb = song.youtubeVideoId ? youtubeThumbnail(song.youtubeVideoId) : null
+  const thumb = youtubeThumb
+  const platform = 'YouTube'
 
   return (
     <div className="song-card" onClick={onClick}>
-      {thumb ? (
+      {thumb && !imageFailed ? (
         <div style={{ position: 'relative', width: '100%', aspectRatio: '16/9', borderRadius: 'var(--r-sm)', overflow: 'hidden', marginBottom: 10 }}>
-          <img src={thumb} alt={song.title}
+          <img src={thumb} alt={song.title} onError={() => setImageFailed(true)}
             style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
           <div style={{ position: 'absolute', bottom: 6, right: 6, background: 'rgba(0,0,0,0.65)', borderRadius: 20, padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
             <svg width="10" height="10" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
-            <span style={{ color: '#fff', fontSize: 10, fontWeight: 600 }}>YouTube</span>
+            <span style={{ color: '#fff', fontSize: 10, fontWeight: 600 }}>{platform}</span>
           </div>
         </div>
       ) : (

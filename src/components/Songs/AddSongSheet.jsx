@@ -112,7 +112,7 @@ export default function AddSongSheet({ open, onClose, onSave, song: editSong }) 
 
       {/* YouTube link */}
       <div className="form-row">
-        <label className="form-label">YouTube Link <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(YouTube link, attachment, or voice memo required)</span></label>
+        <label className="form-label">YouTube Link <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(YouTube, attachment, or voice memo required)</span></label>
         <input className="form-input" placeholder="https://youtu.be/..." value={ytUrl}
           onChange={e => setYtUrl(e.target.value)} />
         {ytUrl && !ytVideoId && (
@@ -141,7 +141,7 @@ export default function AddSongSheet({ open, onClose, onSave, song: editSong }) 
       />
       {!hasMedia && (
         <p style={{ fontSize: 12, color: 'var(--danger)', margin: '-6px 0 14px' }}>
-          Add a valid YouTube link, attach a file, or record a voice memo.
+          Add a YouTube link, attach a file, or record a voice memo.
         </p>
       )}
 

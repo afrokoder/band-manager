@@ -119,6 +119,7 @@ export function useRehearsals() {
   const submitRsvp = async (rehearsalId, userId, status) => {
     const rehearsal = rehearsals.find(item => item.id === rehearsalId)
     if (!rehearsal) throw new Error('Rehearsal not found.')
+    if (rehearsal.cancelled) throw new Error('This rehearsal has been cancelled.')
 
     const lockAt = rehearsal.rsvpLockAt?.toDate?.() || rehearsalLockAt(rehearsal.dateTs)
     if (new Date() >= lockAt) {

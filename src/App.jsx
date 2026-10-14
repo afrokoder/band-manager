@@ -148,6 +148,7 @@ export default function App() {
         {TABS.map(t => (
           <button key={t.id} className={`tab-item ${tab === t.id ? 'active' : ''}`}
             onClick={async () => {
+              if (tab === 'more' && t.id === 'more') window.dispatchEvent(new Event('agm-more-home'))
               if (tab !== t.id && window.__agmGameInProgress && !await dialog.confirm('Your current round will be lost.', { title:'Leave this game?', confirmLabel:'Leave game' })) return
               window.__agmGameInProgress = false
               setTab(t.id); setShowAdd(false)
