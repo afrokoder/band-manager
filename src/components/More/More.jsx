@@ -112,6 +112,7 @@ export default function More({ onNavigate }) {
   const [view,setView]=useState('home')
   const [loopTarget,setLoopTarget]=useState('')
   const savedScroll=useRef(0)
+  useEffect(()=>{const reset=()=>{setView('home');savedScroll.current=0;const scroller=document.querySelector('.content');if(scroller)scroller.scrollTop=0};window.addEventListener('agm-more-home',reset);return()=>window.removeEventListener('agm-more-home',reset)},[])
   useEffect(()=>{const open=e=>{setLoopTarget(e.detail?.src||'');setView('loops')};window.addEventListener('agm-open-loop',open);return()=>window.removeEventListener('agm-open-loop',open)},[])
   const openView=id=>{savedScroll.current=document.querySelector('.content')?.scrollTop||0;setView(id);requestAnimationFrame(()=>{const scroller=document.querySelector('.content');if(scroller)scroller.scrollTop=0})}
   const back=()=>{setView('home');requestAnimationFrame(()=>requestAnimationFrame(()=>{const scroller=document.querySelector('.content');if(scroller)scroller.scrollTop=savedScroll.current}))}

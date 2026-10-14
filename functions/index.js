@@ -145,3 +145,4 @@ exports.midweekReminders = onSchedule({ schedule: '0 10 * * 3-5', timeZone: ZONE
     }))
   }
 })
+

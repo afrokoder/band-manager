@@ -54,6 +54,7 @@ function RehearsalSheet({ open, onClose, onSave, onDelete, rehearsal }) {
   const [time,     setTime]     = useState(rehearsal ? (parseTimeToInput(rehearsal.time) || '10:00') : '10:00')
   const [location, setLocation] = useState(rehearsal?.location !== 'TBD' ? (rehearsal?.location || '') : '')
   const [group,    setGroup]    = useState(rehearsal?.group    || 'all')
+  const [cancelled, setCancelled] = useState(!!rehearsal?.cancelled)
   const [confirm,  setConfirm]  = useState(false)
   const [busy,     setBusy]     = useState(false)
   const [error,    setError]    = useState('')
@@ -62,7 +63,7 @@ function RehearsalSheet({ open, onClose, onSave, onDelete, rehearsal }) {
     if (!name || !date) return
     setBusy(true); setError('')
     try {
-      await onSave({ name, dateStr: formatDate(date), time: formatTime(time), location: location || 'TBD', group, dateTs: new Date(date).getTime() }, rehearsal)
+      await onSave({ name, dateStr: formatDate(date), time: formatTime(time), location: location || 'TBD', group, cancelled, dateTs: new Date(date).getTime() }, rehearsal)
       onClose()
     } catch (e) {
       setError(e?.message || 'Could not save rehearsal.')
@@ -104,6 +105,7 @@ function RehearsalSheet({ open, onClose, onSave, onDelete, rehearsal }) {
           <option value="vocals">Vocals Only</option>
         </select>
       </div>
+      {isEdit && <label className="rehearsal-cancel-toggle"><input type="checkbox" checked={cancelled} onChange={e=>setCancelled(e.target.checked)}/><span><strong>Cancel this rehearsal</strong><small>Members will see a Cancelled notice and cannot RSVP.</small></span></label>}
       {error && <div className="schedule-form-error">{error}</div>}
       <button className="btn-primary" disabled={busy || !name || !date} onClick={save}>
         {busy ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Rehearsal'}
@@ -243,7 +245,7 @@ function RehearsalCard({ r, members, onRsvp, onEdit, canManage }) {
           <strong>{new Date(r.dateTs).getUTCDate()}</strong>
         </div>
         <div className="schedule-card-title-wrap">
-          <div className="schedule-card-eyebrow">REHEARSAL</div>
+          <div className="schedule-card-eyebrow">{r.cancelled ? "REHEARSAL · CANCELLED" : "REHEARSAL"}</div>
           <div className="schedule-card-title">{r.name}</div>
           <div className="schedule-card-meta">{r.dateStr} · {r.time} · {r.location}</div>
         </div>
@@ -255,7 +257,8 @@ function RehearsalCard({ r, members, onRsvp, onEdit, canManage }) {
         </div>
       </div>
 
-      {canRespond && (
+      {r.cancelled && <div className="rehearsal-cancel-notice">This rehearsal has been cancelled. No RSVP is required.</div>}
+      {canRespond && !r.cancelled && (
         <div className={`rsvp-submit-panel ${responseLocked ? 'locked' : ''}`}>
           {responseLocked && (
             <div className="rsvp-locked-note">Responses are locked because rehearsal day has started.</div>

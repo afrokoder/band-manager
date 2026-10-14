@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useLoops } from '../../hooks/useLoops'
 import { useAppDialog } from '../ui/AppDialog'
 
@@ -28,7 +29,7 @@ export default function RehearsalStudio({onBack}){
   const visibleProjects=useMemo(()=>projects.filter(p=>{const q=projectSearch.trim().toLowerCase();if(q&&!String(p.name||'').toLowerCase().includes(q))return false;if(projectFilter==='recent')return Date.now()-(p.updatedAt||0)<1000*60*60*24*30;if(projectFilter==='favorites')return !!p.favorite;return true}),[projects,projectSearch,projectFilter])
 
   useEffect(()=>{listProjects().then(setProjects).catch(()=>{});},[])
-  useEffect(()=>{if(!projectOpen)return;document.body.classList.add('studio-open');document.documentElement.requestFullscreen?.().catch(()=>{});return()=>{document.body.classList.remove('studio-open');if(document.fullscreenElement)document.exitFullscreen?.().catch(()=>{})}},[projectOpen])
+  useEffect(()=>{if(!projectOpen)return;document.body.classList.add('studio-open');return()=>{document.body.classList.remove('studio-open');}},[projectOpen])
   const stopAudio=()=>{sources.current.forEach(a=>{try{clearTimeout(a._timer);a.pause()}catch{}});sources.current=[];cancelAnimationFrame(raf.current);setPlaying(false)}
   useEffect(()=>()=>{stopAudio();stream.current?.getTracks?.().forEach(t=>t.stop());clearInterval(liveTimer.current)},[])
 
@@ -117,7 +118,7 @@ export default function RehearsalStudio({onBack}){
       {!visibleProjects.length&&<div className="studio-no-results">No projects match this view.</div>}
     </>}
   </div>
-  return <div className="studio-fullscreen">
+  return createPortal(<div className="studio-fullscreen">
     <header className="studio-top"><button className="studio-exit" onClick={exit}>‹</button><input className="studio-project-title" value={projectName} onChange={e=>setProjectName(e.target.value)}/><div className="studio-transport horizontal"><button onClick={()=>setPlayhead(0)}>↤</button><button onClick={play} disabled={!!recordingId}>{playing&&!recordingId?'■':'▶'}</button><button className={recordingId?'rec active':'rec'} onClick={startRecord}>●</button><span>{fmt(playhead)}</span></div><button className="studio-save" onClick={saveProject}>{saved?'Saved':'Save'}</button><button className="studio-add" onClick={addTrack} disabled={!!recordingId}>＋ Add Track</button></header>
     <div className="daw-tools studio-tools"><select value={selectedLoop} onChange={e=>{setSelectedLoop(e.target.value);setLoopRegions(e.target.value?[{id:crypto.randomUUID(),start:0,duration:PROJECT_SECONDS,sourceOffset:0,peaks:fakePeaks(2,150)}]:[]);setSelected(null)}}><option value="">No backing loop</option>{loops.map(l=><option key={l.src} value={l.src}>{l.name}</option>)}</select><span className="daw-edit-tools"><button disabled={!region} onClick={split}>✂ Slice</button><button disabled={!region} onClick={cut}>Cut</button><button disabled={!region} onClick={copy}>Copy</button><button disabled={!clipboard||(clipboard.kind!=='loop'&&!activeTrackId)} onClick={paste}>Paste</button><button disabled={!region} onClick={removeRegion}>Delete</button></span><div className="studio-zoom"><button onClick={()=>setZoom(z=>Math.max(3,z-1))}>−</button><span>Zoom</span><button onClick={()=>setZoom(z=>Math.min(14,z+1))}>＋</button></div></div>
     <div className="daw-scroll studio-scroll"><div className="daw-ruler-row"><aside>TRACKS</aside><main style={{width}} onClick={e=>setPlayhead(Math.max(0,e.nativeEvent.offsetX/zoom))}>{Array.from({length:Math.ceil(PROJECT_SECONDS/4)},(_,i)=><span key={i} style={{left:px(i*4,zoom)}}>{i+1}</span>)}<i className="daw-playhead" style={{left:px(playhead,zoom)}}/></main></div>
@@ -126,5 +127,5 @@ export default function RehearsalStudio({onBack}){
       {!tracks.length&&!chosenLoop&&<div className="daw-empty"><strong>＋ Add Track</strong><span>Add Track creates an empty Voice/Audio lane. Select it, then press the red Record button when you are ready.</span></div>}
     </div>
     <footer className="studio-footer">{error?<span className="studio-error">{error}</span>:region?<><strong>Selected region</strong><span>Drag it to move · Playhead {fmt(playhead)} · Slice at playhead</span></>:<><strong>{activeTrackId?'Track selected':'Ready'}</strong><span>{activeTrackId?'Record and pasted regions go to this track.':'Add or select a track to begin.'}</span></>}</footer>
-  </div>
+  </div>, document.body)
 }

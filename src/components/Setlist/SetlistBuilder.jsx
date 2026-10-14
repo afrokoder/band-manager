@@ -337,7 +337,7 @@ export default function SetlistBuilder({ showAdd, onAddClose }) {
   const futurePublished = setlists.filter(s => isPublished(s.status) && (s.serviceDateTs || 0) >= today.getTime()).sort(byServiceDate)
   const drafts = setlists.filter(s => s.status === 'draft' && s.createdBy === myId).sort(byServiceDate)
   const past = setlists.filter(s => isPublished(s.status) && (s.serviceDateTs || 0) < today.getTime()).sort(byServiceDate)
-  const visibleRows = tab === 'drafts' ? drafts : tab === 'past' ? past : futurePublished
+  const visibleRows = tab === 'drafts' ? drafts : futurePublished
   const selectedService = services.find(s => s.id === serviceId)
   const assignedSectionsForUser = service => {
     if (!service || !myId) return []
@@ -444,14 +444,13 @@ export default function SetlistBuilder({ showAdd, onAddClose }) {
       <div className="setlist-overview-card">
         <div><span>Upcoming</span><strong>{futurePublished.length}</strong></div>
         <div><span>My Drafts</span><strong>{drafts.filter(item => item.createdBy === myId).length}</strong></div>
-        <div><span>Past</span><strong>{past.length}</strong></div>
       </div>
       <div className="setlist-tabs">
-        {[['upcoming', 'Upcoming'], ['drafts', 'Drafts'], ['past', 'Past']].map(([id, label]) => <button key={id} type="button" className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>{label}</button>)}
+        {[['upcoming', 'Upcoming'], ['drafts', 'Drafts']].map(([id, label]) => <button key={id} type="button" className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>{label}</button>)}
       </div>
 
       {loading ? <div className="setlist-loading"><div className="spinner" /></div> : visibleRows.length === 0 ? (
-        <div className="setlist-empty-card"><div className="setlist-empty-icon">♫</div><strong>{tab === 'drafts' ? 'No saved drafts' : tab === 'past' ? 'No past set lists' : 'No upcoming set lists'}</strong><span>{tab === 'drafts' ? 'Only drafts you create are visible here.' : tab === 'past' ? 'Published set lists move here after the service date.' : 'Use the + button beside your profile to create one.'}</span></div>
+        <div className="setlist-empty-card"><div className="setlist-empty-icon">♫</div><strong>{tab === 'drafts' ? 'No saved drafts' : 'No upcoming set lists'}</strong><span>{tab === 'drafts' ? 'Only drafts you create are visible here.' : 'Use the + button beside your profile to create one.'}</span></div>
       ) : (
         <div className="setlist-home-list">{visibleRows.map((item, index) => {
           const featured = tab === 'upcoming' && index === 0
