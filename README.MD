@@ -542,37 +542,16 @@ Environment files should remain ignored:
 
 # Firebase Deployment
 
-## Build the frontend
+For now, deploy only Hosting and Firestore. Do not deploy Cloud Functions or Storage, and do not use an unscoped `firebase deploy`.
+
+Build the frontend, then deploy the included resources:
 
 ```bash
 npm run build
+npx -y firebase-tools@latest deploy --only hosting,firestore
 ```
 
-## Deploy Firestore and Storage rules
-
-```bash
-firebase deploy --only firestore:rules,storage
-```
-
-## Deploy Cloud Functions
-
-Cloud Functions require Node.js 20+.
-
-```bash
-firebase deploy --only functions
-```
-
-## Deploy Hosting
-
-```bash
-firebase deploy --only hosting
-```
-
-Or deploy the Firebase resources together when appropriate:
-
-```bash
-firebase deploy
-```
+Use the `dev@amazinggracemn.org` Firebase account and the `band-manager-agm` project.
 
 ---
 

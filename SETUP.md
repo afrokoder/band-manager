@@ -114,13 +114,14 @@ npm run build
 
 Deploy the `dist/` folder to Firebase Hosting, Vercel, Netlify, or any static host.
 
-### Deploy to Firebase Hosting (recommended)
+### Deploy to Firebase Hosting and Firestore (recommended)
+
+For now, do not deploy Cloud Functions or Storage. Use the `dev@amazinggracemn.org` Firebase account and the `band-manager-agm` project.
+
 ```bash
-npm install -g firebase-tools
-firebase login
-firebase init hosting   # select dist as public dir, SPA: yes
+npx -y firebase-tools@latest login
 npm run build
-firebase deploy
+npx -y firebase-tools@latest deploy --only hosting,firestore --project band-manager-agm
 ```
 
 ---
