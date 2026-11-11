@@ -7,6 +7,7 @@ import NotesHub from './NotesHub'
 import InsightsHub from './InsightsHub'
 import PlayHub from './PlayHub'
 import Tuner from './Tuner'
+import PresencePads from './PresencePads'
 import RehearsalStudio from './RehearsalStudio'
 
 function Page({ title, subtitle, onBack, backLabel='More', children }) {
@@ -28,6 +29,7 @@ function MoreHome({ open, onNavigate }) {
       ['tuner','⌁','Tuner','Tune vocals and instruments'],
       ['metronome','◉','Metronome','Practice with a steady pulse'],
       ['loops','↻','Loop Player','Search and play AGM loop tracks'],
+      ['presence','◌','Presence Pads','Ambient worship pads in all 12 keys'],
     ]},
     { title:'Rehearsal Mode', items:[
       ['rehearsal-studio','▥','Studio Mode','Record and layer multiple practice tracks over AGM loops'],
@@ -121,6 +123,7 @@ export default function More({ onNavigate }) {
   if(view==='reports') return <InsightsHub Page={Page} onBack={back} mode="reports"/>
   if(view==='tuner') return <Tuner Page={Page} onBack={back}/>
   if(view==='metronome') return <Metronome onBack={back}/>
+  if(view==='presence') return <PresencePads Page={Page} onBack={back}/>
   if(view==='loops') return <LoopPlayer onBack={back} initialSrc={loopTarget}/>
   if(view==='rehearsal-studio') return <RehearsalStudio Page={Page} onBack={back}/>
   if(view==='learn') return <LearnHub Page={Page} onBack={back}/>
